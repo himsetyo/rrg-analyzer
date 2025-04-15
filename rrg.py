@@ -54,39 +54,40 @@ class RRGAnalyzer:
         
         return download_success
                 
-    def calculate_rs_ratio(self, period=63):
-        """
-        Menghitung Relative Strength Ratio (RS-Ratio)
-        :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
-        """
-        self.rs_ratio = {}  # Reset untuk menghindari data lama
+    def calculate_rs_ratio(self, period=5):  # Gunakan periode lebih pendek
+    """
+    Menghitung Relative Strength Ratio (RS-Ratio) untuk data terbatas
+    """
+    self.rs_ratio = {}
+    
+    for symbol, data in self.stock_data.items():
+        if len(data) < 5:  # Minimal 5 hari data
+            print(f"Data terlalu sedikit untuk {symbol}: {len(data)} hari")
+            continue
         
-        for symbol, data in self.stock_data.items():
-            if len(data) == 0:
-                continue
+        # Gunakan seluruh data yang tersedia
+        common_index = data.index.intersection(self.benchmark_data.index)
+        
+        # Gunakan periode yang lebih pendek berdasarkan data tersedia
+        actual_period = min(period, len(common_index) - 1)
+        if actual_period < 3:  # Minimal 3 hari untuk perhitungan bermakna
+            print(f"Periode terlalu pendek untuk {symbol}: {actual_period} hari")
+            continue
             
-            # Pastikan data memiliki index yang sama
-            common_index = data.index.intersection(self.benchmark_data.index)
-            if len(common_index) < period:
-                print(f"Data tidak cukup untuk {symbol}, minimal {period} hari diperlukan")
-                continue
-                
-            stock_aligned = data.loc[common_index]
-            benchmark_aligned = self.benchmark_data.loc[common_index]
+        stock_aligned = data.loc[common_index]
+        benchmark_aligned = self.benchmark_data.loc[common_index]
+        
+        # Menghitung Relative Strength Ratio
+        relative_price = (stock_aligned['Close'] / benchmark_aligned['Close']) * 100
+        
+        # Gunakan periode pendek dengan min_periods=2
+        rs_ratio = relative_price.rolling(window=actual_period, min_periods=2).mean()
+        rs_ratio = rs_ratio.dropna()
+        
+        if len(rs_ratio) > 0:
+            self.rs_ratio[symbol] = rs_ratio
             
-            # Menghitung Relative Strength Ratio
-            relative_price = (stock_aligned['Close'] / benchmark_aligned['Close']) * 100
-            
-            # Menghitung rata-rata bergerak
-            rs_ratio = relative_price.rolling(window=period, min_periods=1).mean()
-            
-            # Pastikan tidak ada NaN
-            rs_ratio = rs_ratio.dropna()
-            
-            if len(rs_ratio) > 0:
-                self.rs_ratio[symbol] = rs_ratio
-            
-    def calculate_rs_momentum(self, period=21):
+    def calculate_rs_momentum(self, period=3):
         """
         Menghitung Relative Strength Momentum (RS-Momentum)
         :param period: periode untuk perhitungan momentum (default ~1 bulan trading)

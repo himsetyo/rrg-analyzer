@@ -75,13 +75,13 @@ stocks_input = st.sidebar.text_area(
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    period_years = st.number_input("Periode Data (tahun):", 1, 5, 3)
+    period_years = st.number_input("Periode Data (tahun):", 0.5, 5, 3)
 with col2:
     trail_length = st.number_input("Panjang Trail:", 1, 20, 8, help="Jumlah periode terakhir yang ditampilkan pada grafik")
 
 col3, col4 = st.sidebar.columns(2)
 with col3:
-    rs_ratio_period = st.number_input("Periode RS-Ratio:", 20, 100, 63, help="Periode untuk perhitungan RS-Ratio (hari trading)")
+    rs_ratio_period = st.number_input("Periode RS-Ratio:", 10, 100, 63, help="Periode untuk perhitungan RS-Ratio (hari trading)")
 with col4:
     rs_momentum_period = st.number_input("Periode RS-Momentum:", 5, 60, 21, help="Periode untuk perhitungan RS-Momentum (hari trading)")
 
