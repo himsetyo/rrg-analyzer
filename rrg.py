@@ -30,14 +30,36 @@ class RRGAnalyzer:
         start_date = end_date - timedelta(days=self.period_years*365)
         
         # Download data benchmark
-        self.benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
+    try:
+        benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
         
-        # Download data saham
-        for symbol in self.stock_symbols:
-            try:
-                self.stock_data[symbol] = yf.download(symbol, start=start_date, end=end_date, progress=False)
-            except Exception as e:
-                print(f"Error downloading data for {symbol}: {str(e)}")
+        if benchmark_data.empty:
+            raise Exception(f"Data untuk benchmark {self.benchmark_symbol} kosong")
+            
+        self.benchmark_data = benchmark_data
+        print(f"Berhasil download data benchmark {self.benchmark_symbol}: {len(benchmark_data)} baris")
+            
+    except Exception as e:
+        raise Exception(f"Error saat mengunduh data benchmark {self.benchmark_symbol}: {str(e)}")
+    
+    # Download data saham
+    success_count = 0
+    for symbol in self.stock_symbols:
+        try:
+            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
+            
+            if data.empty:
+                print(f"Warning: Data untuk {symbol} kosong")
+                continue
+                
+            self.stock_data[symbol] = data
+            success_count += 1
+            
+        except Exception as e:
+            print(f"Error saat mengunduh data untuk {symbol}: {str(e)}")
+    
+    if success_count == 0:
+        raise Exception("Tidak ada data saham yang berhasil diunduh")
                 
     def calculate_rs_ratio(self, period=63):
         """
