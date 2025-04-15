@@ -1,6 +1,3 @@
-# Install library yang diperlukan
-# pip install pandas numpy matplotlib yfinance
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,14 +30,12 @@ class RRGAnalyzer:
         start_date = end_date - timedelta(days=self.period_years*365)
         
         # Download data benchmark
-        print(f"Downloading data for benchmark {self.benchmark_symbol}...")
-        self.benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date)
+        self.benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
         
         # Download data saham
         for symbol in self.stock_symbols:
-            print(f"Downloading data for {symbol}...")
             try:
-                self.stock_data[symbol] = yf.download(symbol, start=start_date, end=end_date)
+                self.stock_data[symbol] = yf.download(symbol, start=start_date, end=end_date, progress=False)
             except Exception as e:
                 print(f"Error downloading data for {symbol}: {str(e)}")
                 
@@ -139,23 +134,23 @@ class RRGAnalyzer:
         :param title: judul grafik
         :param trail_length: panjang trail (berapa periode sebelumnya yang ditampilkan)
         """
-        plt.figure(figsize=(12, 10))
+        fig, ax = plt.subplots(figsize=(12, 10))
         
         # Gambar garis sumbu
-        plt.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
-        plt.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
+        ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
+        ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
         
         # Tambahkan latar belakang kuadran
-        plt.fill_between([100, 120], 100, 120, color='green', alpha=0.1)  # Leading
-        plt.fill_between([100, 120], 80, 100, color='yellow', alpha=0.1)  # Weakening
-        plt.fill_between([80, 100], 80, 100, color='red', alpha=0.1)      # Lagging
-        plt.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)    # Improving
+        ax.fill_between([100, 120], 100, 120, color='green', alpha=0.1)  # Leading
+        ax.fill_between([100, 120], 80, 100, color='yellow', alpha=0.1)  # Weakening
+        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)      # Lagging
+        ax.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)    # Improving
         
         # Tambahkan label kuadran
-        plt.text(110, 110, 'LEADING', fontsize=12, ha='center')
-        plt.text(110, 90, 'WEAKENING', fontsize=12, ha='center')
-        plt.text(90, 90, 'LAGGING', fontsize=12, ha='center')
-        plt.text(90, 110, 'IMPROVING', fontsize=12, ha='center')
+        ax.text(110, 110, 'LEADING', fontsize=12, ha='center')
+        ax.text(110, 90, 'WEAKENING', fontsize=12, ha='center')
+        ax.text(90, 90, 'LAGGING', fontsize=12, ha='center')
+        ax.text(90, 110, 'IMPROVING', fontsize=12, ha='center')
         
         # Plot data untuk setiap saham
         for symbol in self.stock_symbols:
@@ -165,28 +160,28 @@ class RRGAnalyzer:
                 y_data = self.rs_momentum_norm[symbol].iloc[-trail_length:].values
                 
                 # Plot trail
-                plt.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
+                ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
                 
                 # Plot titik terbaru
-                plt.scatter(x_data[-1], y_data[-1], s=50)
+                ax.scatter(x_data[-1], y_data[-1], s=50)
                 
                 # Tambahkan label
-                plt.annotate(symbol, (x_data[-1], y_data[-1]), 
+                ax.annotate(symbol, (x_data[-1], y_data[-1]), 
                              xytext=(5, 5), textcoords='offset points')
         
-        plt.xlim(80, 120)
-        plt.ylim(80, 120)
-        plt.grid(True, alpha=0.3)
-        plt.xlabel('RS-Ratio (Relative Strength)')
-        plt.ylabel('RS-Momentum')
+        ax.set_xlim(80, 120)
+        ax.set_ylim(80, 120)
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel('RS-Ratio (Relative Strength)')
+        ax.set_ylabel('RS-Momentum')
         
         if title:
-            plt.title(title)
+            ax.set_title(title)
         else:
-            plt.title(f'Relative Rotation Graph (RRG) vs {self.benchmark_symbol}')
+            ax.set_title(f'Relative Rotation Graph (RRG) vs {self.benchmark_symbol}')
         
         plt.tight_layout()
-        plt.show()
+        return fig
     
     def analyze(self):
         """
@@ -198,22 +193,3 @@ class RRGAnalyzer:
         self.normalize_data()
         
         return self.get_latest_data()
-
-# Contoh penggunaan
-if __name__ == "__main__":
-    # Tentukan benchmark dan saham yang akan dianalisis
-    benchmark = "^JKSE"  # IHSG sebagai benchmark
-    stocks = ["BBCA.JK", "BBRI.JK", "TLKM.JK", "ASII.JK", "UNVR.JK", "HMSP.JK", "ICBP.JK", "BMRI.JK", "ANTM.JK", "PGAS.JK"]
-    
-    # Inisialisasi analyzer
-    analyzer = RRGAnalyzer(benchmark, stocks)
-    
-    # Jalankan analisis
-    results = analyzer.analyze()
-    
-    # Tampilkan hasil
-    print("\nHasil Analisis RRG:")
-    print(results)
-    
-    # Plot grafik RRG
-    analyzer.plot_rrg(trail_length=8)
