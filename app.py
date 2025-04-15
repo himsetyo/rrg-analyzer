@@ -229,6 +229,28 @@ else:
 st.markdown("---")
 st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
 
+# Tambahkan di bagian sidebar
+debug_mode = st.sidebar.checkbox("Mode Debug", False)
+
+if debug_mode:
+    st.sidebar.subheader("Informasi Debug")
+    
+    if analyze_button:
+        # Tampilkan info debug saat analisis berjalan
+        st.sidebar.write("Benchmark:", benchmark)
+        st.sidebar.write("Saham:", stocks)
+        
+        # Tambahkan tombol untuk cek data
+        if st.sidebar.button("Cek Ketersediaan Data"):
+            for symbol in [benchmark] + stocks:
+                try:
+                    data = yf.download(symbol, period="1mo", progress=False)
+                    if data.empty:
+                        st.sidebar.error(f"❌ {symbol}: Data kosong")
+                    else:
+                        st.sidebar.success(f"✅ {symbol}: {len(data)} hari data tersedia")
+                except Exception as e:
+                    st.sidebar.error(f"❌ {symbol}: Error - {str(e)}")
 
 # Tambahkan di bagian bawah app.py
 if st.sidebar.checkbox("Debug Info", False):
