@@ -68,6 +68,15 @@ def get_analysis(benchmark, stocks, period_years, rs_ratio_period, rs_momentum_p
     
     return analyzer, results
 
+# Di app.py
+@st.cache_data(ttl=3600)
+def download_single_stock(symbol, start_date, end_date):
+    try:
+        return yf.download(symbol, start=start_date, end=end_date, progress=False)
+    except Exception as e:
+        st.warning(f"Tidak dapat mengunduh data untuk {symbol}: {e}")
+        return pd.DataFrame()
+
 # Input parameter di sidebar
 st.sidebar.header("Parameter Input")
 
