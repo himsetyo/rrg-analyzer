@@ -1,60 +1,92 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import yfinance as yf
 from datetime import datetime, timedelta
+import os
 
 class RRGAnalyzer:
-    def __init__(self, benchmark_symbol, stock_symbols, period_years=3):
+    def __init__(self, benchmark_file=None, stock_files=None, period_years=3):
         """
-        Inisialisasi analyzer RRG
-        :param benchmark_symbol: simbol benchmark (misalnya '^JKSE' untuk IHSG)
-        :param stock_symbols: list simbol saham yang akan dianalisis
+        Inisialisasi analyzer RRG dengan file data
+        :param benchmark_file: path file CSV benchmark
+        :param stock_files: list path file CSV saham
         :param period_years: periode tahun data yang akan diambil
         """
-        self.benchmark_symbol = benchmark_symbol
-        self.stock_symbols = stock_symbols
+        self.benchmark_file = benchmark_file
+        self.stock_files = stock_files if stock_files else []
         self.period_years = period_years
         self.benchmark_data = None
         self.stock_data = {}
+        self.stock_symbols = []
         self.rs_ratio = {}
         self.rs_momentum = {}
         self.rs_ratio_norm = {}
         self.rs_momentum_norm = {}
         
-    def download_data(self):
+    def load_data_from_files(self):
         """
-        Download data historis dari Yahoo Finance
+        Load data dari file CSV
         """
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=self.period_years*365)
-        
-        # Download data benchmark
+        if not self.benchmark_file:
+            print("File benchmark tidak ditemukan")
+            return False
+            
         try:
-            self.benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
+            # Load benchmark data
+            self.benchmark_data = pd.read_csv(self.benchmark_file)
+            
+            # Pastikan format tanggal benar
+            self.benchmark_data['Date'] = pd.to_datetime(self.benchmark_data['Date'])
+            self.benchmark_data.set_index('Date', inplace=True)
+            self.benchmark_data.sort_index(inplace=True)
+            
             if self.benchmark_data.empty:
-                print(f"Tidak dapat mengunduh data untuk benchmark {self.benchmark_symbol}")
+                print("Data benchmark kosong")
                 return False
+                
+            # Filter data berdasarkan periode tahun
+            if self.period_years > 0:
+                end_date = self.benchmark_data.index.max()
+                start_date = end_date - pd.DateOffset(years=self.period_years)
+                self.benchmark_data = self.benchmark_data.loc[start_date:end_date]
+            
+            # Load stock data
+            load_success = False
+            for file_path in self.stock_files:
+                try:
+                    # Extract symbol dari nama file
+                    symbol = os.path.splitext(os.path.basename(file_path))[0]
+                    
+                    # Load data
+                    stock_data = pd.read_csv(file_path)
+                    
+                    # Pastikan format tanggal benar
+                    stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+                    stock_data.set_index('Date', inplace=True)
+                    stock_data.sort_index(inplace=True)
+                    
+                    # Filter data berdasarkan periode tahun
+                    if self.period_years > 0:
+                        stock_data = stock_data.loc[start_date:end_date]
+                    
+                    # Simpan data dan tambahkan symbol
+                    if not stock_data.empty:
+                        self.stock_data[symbol] = stock_data
+                        self.stock_symbols.append(symbol)
+                        load_success = True
+                    else:
+                        print(f"Data kosong untuk {symbol}")
+                        
+                except Exception as e:
+                    print(f"Error saat memuat data untuk {file_path}: {str(e)}")
+            
+            return load_success
+                
         except Exception as e:
-            print(f"Error saat mengunduh benchmark {self.benchmark_symbol}: {str(e)}")
+            print(f"Error saat memuat data dari file: {str(e)}")
             return False
         
-        # Download data saham
-        download_success = False
-        for symbol in self.stock_symbols:
-            try:
-                data = yf.download(symbol, start=start_date, end=end_date, progress=False)
-                if not data.empty:
-                    self.stock_data[symbol] = data
-                    download_success = True
-                else:
-                    print(f"Data kosong untuk {symbol}")
-            except Exception as e:
-                print(f"Error mengunduh data untuk {symbol}: {str(e)}")
-        
-        return download_success
-                
-    def calculate_rs_ratio(self, period=5):
+    def calculate_rs_ratio(self, period=63):
         """
         Menghitung Relative Strength Ratio (RS-Ratio)
         :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
@@ -86,7 +118,7 @@ class RRGAnalyzer:
             if len(rs_ratio) > 0:
                 self.rs_ratio[symbol] = rs_ratio
             
-    def calculate_rs_momentum(self, period=3):
+    def calculate_rs_momentum(self, period=21):
         """
         Menghitung Relative Strength Momentum (RS-Momentum)
         :param period: periode untuk perhitungan momentum (default ~1 bulan trading)
@@ -258,9 +290,6 @@ class RRGAnalyzer:
                     
                     # Tambahkan label (max 5 karakter untuk keterbacaan)
                     label = symbol[:5] if len(symbol) > 5 else symbol
-                    if '.JK' in symbol:
-                        label = symbol.replace('.JK', '')[:5]
-                        
                     ax.annotate(label, (x_data[-1], y_data[-1]), 
                                  xytext=(5, 5), textcoords='offset points')
         
@@ -271,10 +300,12 @@ class RRGAnalyzer:
         ax.set_xlabel('RS-Ratio (Relative Strength)')
         ax.set_ylabel('RS-Momentum')
         
+        benchmark_name = os.path.splitext(os.path.basename(self.benchmark_file))[0] if self.benchmark_file else "Benchmark"
+        
         if title:
             ax.set_title(title)
         else:
-            ax.set_title(f'Relative Rotation Graph (RRG) vs {self.benchmark_symbol}')
+            ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_name}')
         
         plt.tight_layout()
         return fig
@@ -288,10 +319,10 @@ class RRGAnalyzer:
             print("Periode harus positif")
             return None
             
-        # Download data
-        success = self.download_data()
+        # Load data
+        success = self.load_data_from_files()
         if not success:
-            print("Gagal mengunduh data")
+            print("Gagal memuat data")
             return None
             
         # Hitung RRG

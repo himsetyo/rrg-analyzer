@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-import yfinance as yf
 import time
+import os
+import tempfile
 
 # Konfigurasi halaman harus menjadi perintah Streamlit pertama
 st.set_page_config(
@@ -51,42 +52,41 @@ def local_css():
 
 local_css()
 
-# Fungsi cache untuk mengunduh data
-@st.cache_data(ttl=3600)  # Cache selama 1 jam
-def get_analysis(benchmark, stocks, period_years, rs_ratio_period, rs_momentum_period):
-    try:
-        analyzer = RRGAnalyzer(benchmark, stocks, period_years)
-        results = analyzer.analyze(rs_ratio_period=rs_ratio_period, rs_momentum_period=rs_momentum_period)
-        return analyzer, results
-    except Exception as e:
-        st.error(f"Error dalam analisis: {str(e)}")
-        return None, None
+# Sidebar untuk upload file
+st.sidebar.header("Upload Data")
 
-# Input parameter di sidebar
-st.sidebar.header("Parameter Input")
-
-benchmark = st.sidebar.text_input("Benchmark Symbol:", "^JKSE", help="Contoh: ^JKSE untuk IHSG, ^GSPC untuk S&P 500")
-
-stocks_input = st.sidebar.text_area(
-    "Daftar Saham (satu simbol per baris):",
-    "BBCA.JK\nBBRI.JK\nTLKM.JK\nASII.JK\nUNVR.JK",
-    help="Untuk saham Indonesia, tambahkan .JK di akhir simbol. Contoh: BBCA.JK"
+# Upload benchmark file
+benchmark_file = st.sidebar.file_uploader(
+    "Upload file CSV Benchmark (contoh: IHSG.csv):",
+    type=["csv"],
+    help="File CSV dengan format: Date,Open,High,Low,Close,Volume"
 )
+
+# Upload stock files
+stock_files = st.sidebar.file_uploader(
+    "Upload file CSV Saham (multiple files):",
+    type=["csv"],
+    accept_multiple_files=True,
+    help="File CSV dengan format: Date,Open,High,Low,Close,Volume"
+)
+
+# Parameter analisis
+st.sidebar.header("Parameter Analisis")
 
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    period_years = st.number_input("Periode Data (tahun):", 0.5, 5, 3)
+    period_years = st.number_input("Periode Data (tahun):", 0.5, 10.0, 3.0, step=0.5)
 with col2:
     trail_length = st.number_input("Panjang Trail:", 1, 20, 8, help="Jumlah periode terakhir yang ditampilkan pada grafik")
 
 col3, col4 = st.sidebar.columns(2)
 with col3:
-    rs_ratio_period = st.number_input("Periode RS-Ratio:", 10, 100, 63, help="Periode untuk perhitungan RS-Ratio (hari trading)")
+    rs_ratio_period = st.number_input("Periode RS-Ratio:", 5, 100, 63, help="Periode untuk perhitungan RS-Ratio (hari trading)")
 with col4:
-    rs_momentum_period = st.number_input("Periode RS-Momentum:", 5, 60, 21, help="Periode untuk perhitungan RS-Momentum (hari trading)")
+    rs_momentum_period = st.number_input("Periode RS-Momentum:", 3, 60, 21, help="Periode untuk perhitungan RS-Momentum (hari trading)")
 
 # Debug mode
-debug_mode = st.sidebar.checkbox("Mode Debug", False)
+debug_mode = st.sidebar.checkbox("Mode Debug", True)
 
 # Tombol untuk menjalankan analisis
 analyze_button = st.sidebar.button("🔍 Jalankan Analisis", type="primary")
@@ -110,31 +110,39 @@ with st.sidebar.expander("ℹ️ Tentang RRG"):
     - Rotasi biasanya bergerak searah jarum jam: Improving → Leading → Weakening → Lagging
     """)
 
+# Fungsi untuk menyimpan file yang di-upload ke file sementara
+def save_uploaded_file(uploaded_file):
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as f:
+        f.write(uploaded_file.getvalue())
+        return f.name
+
 if analyze_button:
-    stocks = [s.strip() for s in stocks_input.split("\n") if s.strip()]
-    
-    if not stocks:
-        st.error("Silakan masukkan setidaknya satu simbol saham.")
+    if benchmark_file is None:
+        st.error("Silakan upload file benchmark terlebih dahulu.")
+    elif not stock_files:
+        st.error("Silakan upload setidaknya satu file saham.")
     else:
         try:
+            # Simpan file ke temporary files
+            benchmark_temp = save_uploaded_file(benchmark_file)
+            stock_temps = [save_uploaded_file(f) for f in stock_files]
+            
             # Mode debug
             if debug_mode:
                 st.sidebar.subheader("Informasi Debug")
-                st.sidebar.write("Benchmark:", benchmark)
-                st.sidebar.write("Saham:", stocks)
+                st.sidebar.write("Benchmark:", benchmark_file.name)
+                st.sidebar.write("Jumlah File Saham:", len(stock_files))
                 
-                # Cek ketersediaan data
-                st.sidebar.subheader("Ketersediaan Data")
-                for symbol in [benchmark] + stocks:
-                    try:
-                        with st.sidebar.status(f"Mengecek {symbol}..."):
-                            data = yf.download(symbol, period="1mo", progress=False)
-                            if data.empty:
-                                st.sidebar.error(f"❌ {symbol}: Data kosong")
-                            else:
-                                st.sidebar.success(f"✅ {symbol}: {len(data)} hari data tersedia")
-                    except Exception as e:
-                        st.sidebar.error(f"❌ {symbol}: Error - {str(e)}")
+                # Preview data benchmark
+                st.sidebar.subheader("Preview Benchmark")
+                benchmark_preview = pd.read_csv(benchmark_temp)
+                st.sidebar.write(benchmark_preview.head(3))
+                
+                # Preview data saham pertama
+                if stock_files:
+                    st.sidebar.subheader(f"Preview {stock_files[0].name}")
+                    stock_preview = pd.read_csv(stock_temps[0])
+                    st.sidebar.write(stock_preview.head(3))
             
             # Jalankan analisis dengan progress bar
             progress_text = "Menganalisis data saham..."
@@ -142,30 +150,42 @@ if analyze_button:
             
             # Step 1: Inisialisasi
             my_bar.progress(10, text="Inisialisasi analisis...")
-            analyzer = RRGAnalyzer(benchmark, stocks, period_years)
+            analyzer = RRGAnalyzer(benchmark_file=benchmark_temp, stock_files=stock_temps, period_years=period_years)
             
-            # Step 2: Download data
-            my_bar.progress(20, text="Mengunduh data historis...")
-            success = analyzer.download_data()
+            # Step 2: Load data
+            my_bar.progress(30, text="Memuat data dari file CSV...")
+            success = analyzer.load_data_from_files()
             if not success:
-                st.error("Gagal mengunduh data. Periksa simbol dan koneksi internet Anda.")
+                st.error("Gagal memuat data dari file. Periksa format file CSV Anda.")
                 my_bar.empty()
+                # Clean up temp files
+                os.unlink(benchmark_temp)
+                for temp_file in stock_temps:
+                    os.unlink(temp_file)
                 st.stop()
             
             # Step 3: Hitung RS-Ratio
-            my_bar.progress(40, text="Menghitung RS-Ratio...")
+            my_bar.progress(50, text="Menghitung RS-Ratio...")
             analyzer.calculate_rs_ratio(period=rs_ratio_period)
             if not analyzer.rs_ratio:
                 st.error("Gagal menghitung RS-Ratio. Mungkin tidak cukup data.")
                 my_bar.empty()
+                # Clean up temp files
+                os.unlink(benchmark_temp)
+                for temp_file in stock_temps:
+                    os.unlink(temp_file)
                 st.stop()
             
             # Step 4: Hitung RS-Momentum
-            my_bar.progress(60, text="Menghitung RS-Momentum...")
+            my_bar.progress(70, text="Menghitung RS-Momentum...")
             analyzer.calculate_rs_momentum(period=rs_momentum_period)
             if not analyzer.rs_momentum:
                 st.error("Gagal menghitung RS-Momentum. Mungkin tidak cukup data.")
                 my_bar.empty()
+                # Clean up temp files
+                os.unlink(benchmark_temp)
+                for temp_file in stock_temps:
+                    os.unlink(temp_file)
                 st.stop()
             
             # Step 5: Normalisasi data
@@ -174,6 +194,10 @@ if analyze_button:
             if not success:
                 st.error("Gagal melakukan normalisasi data. Mungkin tidak cukup variasi dalam data.")
                 my_bar.empty()
+                # Clean up temp files
+                os.unlink(benchmark_temp)
+                for temp_file in stock_temps:
+                    os.unlink(temp_file)
                 st.stop()
             
             # Step 6: Dapatkan hasil
@@ -184,6 +208,11 @@ if analyze_button:
             my_bar.progress(100, text="Analisis selesai!")
             time.sleep(0.5)  # Beri waktu user untuk melihat progress 100%
             my_bar.empty()
+            
+            # Clean up temp files
+            os.unlink(benchmark_temp)
+            for temp_file in stock_temps:
+                os.unlink(temp_file)
             
             # Tampilkan hasil
             if results is None or len(results) == 0:
@@ -274,7 +303,6 @@ if analyze_button:
         
         except Exception as e:
             st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
-            st.info("Periksa apakah simbol saham dan benchmark sudah benar. Pastikan juga koneksi internet Anda stabil.")
             
             if debug_mode:
                 st.error(f"Detail error: {str(e)}")
@@ -282,12 +310,9 @@ if analyze_button:
                 st.code(traceback.format_exc())
 else:
     # Tampilkan info default ketika aplikasi pertama kali dibuka
-    st.info("👈 Masukkan parameter analisis di panel sebelah kiri, lalu klik 'Jalankan Analisis'.")
+    st.info("👈 Upload file CSV di panel sebelah kiri dan atur parameter, lalu klik 'Jalankan Analisis'.")
     
-    # Tampilkan contoh RRG
-    st.image("https://chartschool.stockcharts.com/~gitbook/image?url=https%3A%2F%2F436553459-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FERtrZrZOhufFzk6ZQO4B%252Fuploads%252FNj5BTpv50yRLXg4kNUHw%252Frrgs-03-quandrants.png%3Falt%3Dmedia%26token%3D6d870d19-af00-4f12-b1b1-acbd9ee535ef", 
-             caption="Contoh visualisasi Relative Rotation Graph (RRG)")
-
-# Footer
-st.markdown("---")
-st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
+    # Tampilkan contoh format file CSV
+    with st.expander("📝 Format File CSV yang Diperlukan"):
+        st.markdown("""
+        ### Format untuk Data Benchmark (misalnya:
