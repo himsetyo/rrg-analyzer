@@ -62,21 +62,32 @@ class RRGAnalyzer:
         raise Exception("Tidak ada data saham yang berhasil diunduh")
                 
     def calculate_rs_ratio(self, period=63):
-        """
-        Menghitung Relative Strength Ratio (RS-Ratio)
-        :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
-        """
-        for symbol, data in self.stock_data.items():
-            if len(data) == 0:
-                continue
-                
-            # Menghitung Relative Strength Ratio
-            relative_price = (data['Close'] / self.benchmark_data['Close']) * 100
+    """
+    Menghitung Relative Strength Ratio (RS-Ratio)
+    :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
+    """
+    for symbol, data in self.stock_data.items():
+        if len(data) == 0:
+            continue
             
-            # Menghitung rata-rata bergerak
-            rs_ratio = relative_price.rolling(window=period).mean()
+        # Pastikan benchmark dan data saham memiliki index yang sama
+        # Dengan melakukan reindex pada data yang sama-sama ada
+        common_index = data.index.intersection(self.benchmark_data.index)
+        
+        if len(common_index) == 0:
+            print(f"Warning: Tidak ada tanggal yang sama antara {symbol} dan benchmark")
+            continue
             
-            self.rs_ratio[symbol] = rs_ratio
+        stock_aligned = data.loc[common_index]
+        benchmark_aligned = self.benchmark_data.loc[common_index]
+        
+        # Menghitung Relative Strength Ratio
+        relative_price = (stock_aligned['Close'] / benchmark_aligned['Close']) * 100
+        
+        # Menghitung rata-rata bergerak
+        rs_ratio = relative_price.rolling(window=min(period, len(relative_price))).mean()
+        
+        self.rs_ratio[symbol] = rs_ratio
             
     def calculate_rs_momentum(self, period=21):
         """
