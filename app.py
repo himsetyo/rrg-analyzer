@@ -4,8 +4,24 @@ import matplotlib.pyplot as plt
 import time
 from datetime import datetime
 
+# Konfigurasi halaman
+st.set_page_config(
+    page_title="RRG Analyzer",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Import kelas RRGAnalyzer dari file rrg.py
 from rrg import RRGAnalyzer
+
+# Judul aplikasi
+st.title("📊 Relative Rotation Graph (RRG) Analyzer")
+
+st.markdown("""
+Aplikasi ini menganalisis kinerja relatif saham-saham dalam portofolio Anda 
+dibandingkan dengan benchmark menggunakan metode Relative Rotation Graph (RRG).
+""")
 
 def local_css():
     st.markdown("""
@@ -28,23 +44,6 @@ def local_css():
     """, unsafe_allow_html=True)
 
 local_css()
-
-
-# Konfigurasi halaman
-st.set_page_config(
-    page_title="RRG Analyzer",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Judul aplikasi
-st.title("📊 Relative Rotation Graph (RRG) Analyzer")
-
-st.markdown("""
-Aplikasi ini menganalisis kinerja relatif saham-saham dalam portofolio Anda 
-dibandingkan dengan benchmark menggunakan metode Relative Rotation Graph (RRG).
-""")
 
 # Fungsi cache untuk mengunduh data
 @st.cache_data(ttl=3600)  # Cache selama 1 jam
