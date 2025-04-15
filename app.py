@@ -7,8 +7,6 @@ from datetime import datetime
 # Import kelas RRGAnalyzer dari file rrg.py
 from rrg import RRGAnalyzer
 
-pip install setuptools
-
 def local_css():
     st.markdown("""
     <style>
