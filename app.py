@@ -7,6 +7,30 @@ from datetime import datetime
 # Import kelas RRGAnalyzer dari file rrg.py
 from rrg import RRGAnalyzer
 
+
+def local_css():
+    st.markdown("""
+    <style>
+        .stApp {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        h1 {
+            color: #0066cc;
+        }
+        .stButton>button {
+            width: 100%;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+local_css()
+
+
 # Konfigurasi halaman
 st.set_page_config(
     page_title="RRG Analyzer",
@@ -197,3 +221,11 @@ else:
 # Footer
 st.markdown("---")
 st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
+
+
+# Tambahkan di bagian bawah app.py
+if st.sidebar.checkbox("Debug Info", False):
+    st.sidebar.write("Informasi Debug:")
+    st.sidebar.write(f"Streamlit version: {st.__version__}")
+    st.sidebar.write(f"Pandas version: {pd.__version__}")
+    st.sidebar.write(f"Current time: {datetime.now()}")
