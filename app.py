@@ -315,4 +315,32 @@ else:
     # Tampilkan contoh format file CSV
     with st.expander("📝 Format File CSV yang Diperlukan"):
         st.markdown("""
-        ### Format untuk Data Benchmark (misalnya:
+        ### Format untuk Data Benchmark (misalnya: IHSG.csv)
+
+        ```csv
+        Date,Open,High,Low,Close,Volume
+        2024-01-01,7100.5,7150.2,7095.6,7125.8,10500000
+        2024-01-02,7125.8,7180.4,7110.3,7160.7,11200000
+        ...
+        ```
+
+        ### Format untuk Data Saham (misalnya: BBCA.csv)
+
+        ```csv
+        Date,Open,High,Low,Close,Volume
+        2024-01-01,9500,9550,9475,9525,5000000
+        2024-01-02,9525,9600,9510,9590,5500000
+        ...
+        ```
+
+        ### Catatan Penting Format:
+        - **Header**: Wajib menggunakan header `Date,Open,High,Low,Close,Volume`
+        - **Format Tanggal**: Sebaiknya gunakan format YYYY-MM-DD (2024-01-01)
+        - **Pemisah Desimal**: Gunakan titik (.) bukan koma (,)
+        - **Pemisah Kolom**: Gunakan koma (,) - format CSV standar
+        - **Urutan Data**: Urutkan dari tanggal terlama ke terbaru (ascending)
+        """)
+
+# Footer
+st.markdown("---")
+st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
