@@ -1,4 +1,5 @@
 import streamlit as st
+pip install setuptools
 
 st.title("RRG Analyzer - Diagnostic Mode")
 st.write("Jika Anda bisa melihat halaman ini, berarti deployment dasar berhasil!")
