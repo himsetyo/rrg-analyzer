@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import os
 import tempfile
@@ -112,6 +112,18 @@ else:
 # Parameter analisis
 st.sidebar.header("Parameter Analisis")
 
+# Maksimal tanggal analisis
+use_max_date = st.sidebar.checkbox("Batasi Tanggal Analisis", value=False, 
+                                 help="Aktifkan untuk membatasi analisis hingga tanggal tertentu")
+if use_max_date:
+    max_date = st.sidebar.date_input(
+        "Maksimal Tanggal Analisis:",
+        datetime.now() - timedelta(days=1),
+        help="Analisis hanya akan menggunakan data hingga tanggal ini"
+    )
+else:
+    max_date = None
+
 col1, col2 = st.sidebar.columns(2)
 with col1:
     period_years = st.number_input("Periode Data (tahun):", 0.5, 10.0, 3.0, step=0.5)
@@ -130,8 +142,13 @@ debug_mode = st.sidebar.checkbox("Mode Debug", True)
 # Tombol untuk menjalankan analisis
 analyze_button = st.sidebar.button("🔍 Jalankan Analisis", type="primary")
 
-# Tampilkan tanggal analisis
-st.sidebar.markdown(f"**Tanggal Analisis:** {datetime.now().strftime('%d %B %Y')}")
+# Tampilkan tanggal analisis saat ini
+current_date = datetime.now().strftime('%d %B %Y')
+if use_max_date:
+    analysis_date = max_date.strftime('%d %B %Y')
+    st.sidebar.markdown(f"**Tanggal Analisis:** {analysis_date} (dibatasi)")
+else:
+    st.sidebar.markdown(f"**Tanggal Analisis:** {current_date} (terkini)")
 
 # Tampilkan penjelasan RRG
 with st.sidebar.expander("ℹ️ Tentang RRG"):
@@ -178,6 +195,8 @@ if analyze_button:
                 st.sidebar.write("File Excel:", excel_file.name)
                 st.sidebar.write("Benchmark Ticker:", benchmark_ticker)
                 st.sidebar.write("Stock Tickers:", stock_tickers)
+                if use_max_date:
+                    st.sidebar.write("Maksimal Tanggal:", max_date)
             
             # Jalankan analisis dengan progress bar
             progress_text = "Menganalisis data saham..."
@@ -185,7 +204,9 @@ if analyze_button:
             
             # Step 1: Inisialisasi
             my_bar.progress(10, text="Inisialisasi analisis...")
-            analyzer = RRGAnalyzer(excel_file=excel_temp, benchmark_ticker=benchmark_ticker, stock_tickers=stock_tickers, period_years=period_years)
+            analyzer = RRGAnalyzer(excel_file=excel_temp, benchmark_ticker=benchmark_ticker, 
+                                  stock_tickers=stock_tickers, period_years=period_years,
+                                  max_date=max_date)
             
             # Step 2: Load data
             my_bar.progress(30, text="Memuat data dari Excel Bloomberg...")
@@ -243,6 +264,10 @@ if analyze_button:
             if results is None or len(results) == 0:
                 st.error("Tidak dapat melakukan analisis. Pastikan data tersedia dan parameter sudah benar.")
             else:
+                # Tampilkan tanggal analisis aktual
+                analysis_date = analyzer.get_analysis_date().strftime('%d %B %Y')
+                st.subheader(f"Analisis pada tanggal: {analysis_date}")
+                
                 # Bagi layar menjadi dua kolom
                 col_chart, col_table = st.columns([2, 1])
                 
@@ -354,6 +379,8 @@ if analyze_button:
                     st.sidebar.subheader("Informasi Debug")
                     st.sidebar.write("Benchmark:", benchmark_file.name)
                     st.sidebar.write("Jumlah File Saham:", len(stock_files))
+                    if use_max_date:
+                        st.sidebar.write("Maksimal Tanggal:", max_date)
                     
                     # Preview data benchmark
                     st.sidebar.subheader("Preview Benchmark")
@@ -372,7 +399,8 @@ if analyze_button:
                 
                 # Step 1: Inisialisasi
                 my_bar.progress(10, text="Inisialisasi analisis...")
-                analyzer = RRGAnalyzer(benchmark_file=benchmark_temp, stock_files=stock_temps, period_years=period_years)
+                analyzer = RRGAnalyzer(benchmark_file=benchmark_temp, stock_files=stock_temps, 
+                                     period_years=period_years, max_date=max_date)
                 
                 # Step 2: Load data
                 my_bar.progress(30, text="Memuat data dari file CSV...")
@@ -440,6 +468,10 @@ if analyze_button:
                 if results is None or len(results) == 0:
                     st.error("Tidak dapat melakukan analisis. Pastikan data tersedia dan parameter sudah benar.")
                 else:
+                    # Tampilkan tanggal analisis aktual
+                    analysis_date = analyzer.get_analysis_date().strftime('%d %B %Y')
+                    st.subheader(f"Analisis pada tanggal: {analysis_date}")
+                    
                     # Bagi layar menjadi dua kolom
                     col_chart, col_table = st.columns([2, 1])
                     

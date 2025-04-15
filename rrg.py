@@ -6,20 +6,38 @@ import os
 import re
 
 class RRGAnalyzer:
-    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, period_years=3):
+    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, 
+                 benchmark_file=None, stock_files=None, period_years=3, max_date=None):
         """
-        Inisialisasi analyzer RRG dengan file Excel Bloomberg
+        Inisialisasi analyzer RRG
         :param excel_file: path file Excel dari Bloomberg
         :param benchmark_ticker: ticker benchmark (misalnya "JCI Index")
         :param stock_tickers: list ticker saham untuk analisis
-        :param period_years: periode tahun data yang akan digunakan
+        :param benchmark_file: path file CSV benchmark (untuk mode CSV)
+        :param stock_files: list path file CSV saham (untuk mode CSV)
+        :param period_years: periode tahun data yang akan diambil
+        :param max_date: tanggal maksimal untuk analisis (datetime atau string 'YYYY-MM-DD')
         """
         self.excel_file = excel_file
         self.benchmark_ticker = benchmark_ticker
         self.stock_tickers = stock_tickers if stock_tickers else []
+        self.benchmark_file = benchmark_file
+        self.stock_files = stock_files if stock_files else []
         self.period_years = period_years
+        
+        # Konversi max_date ke datetime jika string
+        if isinstance(max_date, str):
+            try:
+                self.max_date = datetime.strptime(max_date, '%Y-%m-%d')
+            except:
+                print(f"Format tanggal tidak valid: {max_date}. Menggunakan tanggal hari ini.")
+                self.max_date = datetime.now()
+        else:
+            self.max_date = max_date if max_date else datetime.now()
+            
         self.benchmark_data = None
         self.stock_data = {}
+        self.stock_symbols = []
         self.rs_ratio = {}
         self.rs_momentum = {}
         self.rs_ratio_norm = {}
@@ -99,6 +117,9 @@ class RRGAnalyzer:
                 benchmark_data = benchmark_data.set_index('Date')
                 benchmark_data = benchmark_data.apply(pd.to_numeric, errors='coerce')
                 
+                # Filter berdasarkan max_date
+                benchmark_data = benchmark_data[benchmark_data.index <= self.max_date]
+                
                 # Filter untuk periode yang diminta
                 if self.period_years > 0:
                     end_date = benchmark_data.index.max()
@@ -122,6 +143,9 @@ class RRGAnalyzer:
                     stock_data = stock_data.set_index('Date')
                     stock_data = stock_data.apply(pd.to_numeric, errors='coerce')
                     
+                    # Filter berdasarkan max_date
+                    stock_data = stock_data[stock_data.index <= self.max_date]
+                    
                     # Filter untuk periode yang diminta
                     if self.period_years > 0:
                         end_date = stock_data.index.max()
@@ -130,6 +154,8 @@ class RRGAnalyzer:
                     
                     # Simpan data saham
                     self.stock_data[ticker] = stock_data
+                    # Tambahkan ke daftar simbol
+                    self.stock_symbols.append(ticker)
             
             # Periksa apakah ada data saham yang berhasil dimuat
             if not self.stock_data:
@@ -144,6 +170,76 @@ class RRGAnalyzer:
             traceback.print_exc()
             return False
         
+    def load_data_from_files(self):
+        """
+        Load data dari file CSV
+        """
+        if not self.benchmark_file:
+            print("File benchmark tidak ditemukan")
+            return False
+            
+        try:
+            # Load benchmark data
+            self.benchmark_data = pd.read_csv(self.benchmark_file)
+            
+            # Pastikan format tanggal benar
+            self.benchmark_data['Date'] = pd.to_datetime(self.benchmark_data['Date'])
+            self.benchmark_data.set_index('Date', inplace=True)
+            self.benchmark_data.sort_index(inplace=True)
+            
+            # Filter berdasarkan max_date
+            self.benchmark_data = self.benchmark_data[self.benchmark_data.index <= self.max_date]
+            
+            if self.benchmark_data.empty:
+                print("Data benchmark kosong")
+                return False
+                
+            # Filter data berdasarkan periode tahun
+            if self.period_years > 0:
+                end_date = self.benchmark_data.index.max()
+                start_date = end_date - pd.DateOffset(years=self.period_years)
+                self.benchmark_data = self.benchmark_data.loc[start_date:end_date]
+            
+            # Load stock data
+            load_success = False
+            self.stock_symbols = []  # Reset daftar symbol
+            for file_path in self.stock_files:
+                try:
+                    # Extract symbol dari nama file
+                    symbol = os.path.splitext(os.path.basename(file_path))[0]
+                    
+                    # Load data
+                    stock_data = pd.read_csv(file_path)
+                    
+                    # Pastikan format tanggal benar
+                    stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+                    stock_data.set_index('Date', inplace=True)
+                    stock_data.sort_index(inplace=True)
+                    
+                    # Filter berdasarkan max_date
+                    stock_data = stock_data[stock_data.index <= self.max_date]
+                    
+                    # Filter data berdasarkan periode tahun
+                    if self.period_years > 0:
+                        stock_data = stock_data.loc[start_date:end_date]
+                    
+                    # Simpan data dan tambahkan symbol
+                    if not stock_data.empty:
+                        self.stock_data[symbol] = stock_data
+                        self.stock_symbols.append(symbol)
+                        load_success = True
+                    else:
+                        print(f"Data kosong untuk {symbol}")
+                        
+                except Exception as e:
+                    print(f"Error saat memuat data untuk {file_path}: {str(e)}")
+            
+            return load_success
+                
+        except Exception as e:
+            print(f"Error saat memuat data dari file: {str(e)}")
+            return False
+        
     def calculate_rs_ratio(self, period=63):
         """
         Menghitung Relative Strength Ratio (RS-Ratio)
@@ -151,8 +247,9 @@ class RRGAnalyzer:
         """
         self.rs_ratio = {}  # Reset untuk menghindari data lama
         
-        for ticker, data in self.stock_data.items():
-            if len(data) == 0:
+        for ticker in self.stock_symbols:
+            data = self.stock_data.get(ticker)
+            if data is None or len(data) == 0:
                 continue
             
             # Pastikan data memiliki index yang sama
@@ -266,7 +363,7 @@ class RRGAnalyzer:
         """
         latest_data = []
         
-        for ticker in self.stock_tickers:
+        for ticker in self.stock_symbols:
             if (ticker in self.rs_ratio_norm and 
                 ticker in self.rs_momentum_norm and 
                 not self.rs_ratio_norm[ticker].empty and 
@@ -370,14 +467,22 @@ class RRGAnalyzer:
         ax.set_ylabel('RS-Momentum')
         
         # Format judul dengan nama benchmark yang lebih bersih
-        benchmark_display = self.benchmark_ticker
-        if " Index" in benchmark_display:
-            benchmark_display = benchmark_display.replace(" Index", "")
+        if self.benchmark_ticker:
+            benchmark_display = self.benchmark_ticker
+            if " Index" in benchmark_display:
+                benchmark_display = benchmark_display.replace(" Index", "")
+        elif self.benchmark_file:
+            benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
+        else:
+            benchmark_display = "Benchmark"
+        
+        # Tambahkan tanggal analisis ke judul
+        analysis_date = self.get_analysis_date().strftime('%d %b %Y')
         
         if title:
-            ax.set_title(title)
+            ax.set_title(f"{title} ({analysis_date})")
         else:
-            ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_display}')
+            ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_display} ({analysis_date})')
         
         plt.tight_layout()
         return fig
@@ -392,7 +497,11 @@ class RRGAnalyzer:
             return None
             
         # Load data
-        success = self.load_data_from_bloomberg_excel()
+        if self.excel_file:
+            success = self.load_data_from_bloomberg_excel()
+        else:
+            success = self.load_data_from_files()
+            
         if not success:
             print("Gagal memuat data")
             return None
@@ -421,3 +530,11 @@ class RRGAnalyzer:
             return None
             
         return result
+        
+    def get_analysis_date(self):
+        """
+        Mendapatkan tanggal analisis (tanggal maksimal yang digunakan)
+        """
+        if self.benchmark_data is not None and not self.benchmark_data.empty:
+            return self.benchmark_data.index.max()
+        return self.max_date
