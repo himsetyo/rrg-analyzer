@@ -30,73 +30,67 @@ class RRGAnalyzer:
         start_date = end_date - timedelta(days=self.period_years*365)
         
         # Download data benchmark
-    try:
-        benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
-        
-        if benchmark_data.empty:
-            raise Exception(f"Data untuk benchmark {self.benchmark_symbol} kosong")
-            
-        self.benchmark_data = benchmark_data
-        print(f"Berhasil download data benchmark {self.benchmark_symbol}: {len(benchmark_data)} baris")
-            
-    except Exception as e:
-        raise Exception(f"Error saat mengunduh data benchmark {self.benchmark_symbol}: {str(e)}")
-    
-    # Download data saham
-    success_count = 0
-    for symbol in self.stock_symbols:
         try:
-            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
-            
-            if data.empty:
-                print(f"Warning: Data untuk {symbol} kosong")
-                continue
-                
-            self.stock_data[symbol] = data
-            success_count += 1
-            
+            self.benchmark_data = yf.download(self.benchmark_symbol, start=start_date, end=end_date, progress=False)
+            if self.benchmark_data.empty:
+                print(f"Tidak dapat mengunduh data untuk benchmark {self.benchmark_symbol}")
+                return False
         except Exception as e:
-            print(f"Error saat mengunduh data untuk {symbol}: {str(e)}")
-    
-    if success_count == 0:
-        raise Exception("Tidak ada data saham yang berhasil diunduh")
+            print(f"Error saat mengunduh benchmark {self.benchmark_symbol}: {str(e)}")
+            return False
+        
+        # Download data saham
+        download_success = False
+        for symbol in self.stock_symbols:
+            try:
+                data = yf.download(symbol, start=start_date, end=end_date, progress=False)
+                if not data.empty:
+                    self.stock_data[symbol] = data
+                    download_success = True
+                else:
+                    print(f"Data kosong untuk {symbol}")
+            except Exception as e:
+                print(f"Error mengunduh data untuk {symbol}: {str(e)}")
+        
+        return download_success
                 
     def calculate_rs_ratio(self, period=63):
-    """
-    Menghitung Relative Strength Ratio (RS-Ratio)
-    :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
-    """
-    for symbol, data in self.stock_data.items():
-        if len(data) == 0:
-            continue
+        """
+        Menghitung Relative Strength Ratio (RS-Ratio)
+        :param period: periode untuk perhitungan rata-rata (default ~3 bulan trading)
+        """
+        for symbol, data in self.stock_data.items():
+            if len(data) == 0:
+                continue
             
-        # Pastikan benchmark dan data saham memiliki index yang sama
-        # Dengan melakukan reindex pada data yang sama-sama ada
-        common_index = data.index.intersection(self.benchmark_data.index)
-        
-        if len(common_index) == 0:
-            print(f"Warning: Tidak ada tanggal yang sama antara {symbol} dan benchmark")
-            continue
+            # Pastikan data memiliki index yang sama
+            common_index = data.index.intersection(self.benchmark_data.index)
+            if len(common_index) == 0:
+                continue
+                
+            stock_aligned = data.loc[common_index]
+            benchmark_aligned = self.benchmark_data.loc[common_index]
             
-        stock_aligned = data.loc[common_index]
-        benchmark_aligned = self.benchmark_data.loc[common_index]
-        
-        # Menghitung Relative Strength Ratio
-        relative_price = (stock_aligned['Close'] / benchmark_aligned['Close']) * 100
-        
-        # Menghitung rata-rata bergerak
-        rs_ratio = relative_price.rolling(window=min(period, len(relative_price))).mean()
-        
-        self.rs_ratio[symbol] = rs_ratio
+            # Menghitung Relative Strength Ratio
+            relative_price = (stock_aligned['Close'] / benchmark_aligned['Close']) * 100
+            
+            # Menghitung rata-rata bergerak
+            rs_ratio = relative_price.rolling(window=min(period, len(relative_price))).mean()
+            
+            self.rs_ratio[symbol] = rs_ratio
             
     def calculate_rs_momentum(self, period=21):
         """
         Menghitung Relative Strength Momentum (RS-Momentum)
         :param period: periode untuk perhitungan momentum (default ~1 bulan trading)
         """
-        for symbol, rs_ratio in self.rs_ratio.items():
+        for symbol in list(self.rs_ratio.keys()):
+            rs_ratio_series = self.rs_ratio[symbol]
+            if len(rs_ratio_series) <= period:
+                continue
+                
             # Menghitung persentase perubahan RS-Ratio
-            rs_momentum = rs_ratio.pct_change(periods=period) * 100
+            rs_momentum = rs_ratio_series.pct_change(periods=period) * 100
             
             self.rs_momentum[symbol] = rs_momentum
             
@@ -108,10 +102,20 @@ class RRGAnalyzer:
         all_rs_ratio = []
         all_rs_momentum = []
         
+        valid_symbols = []
         for symbol in self.stock_symbols:
             if symbol in self.rs_ratio and symbol in self.rs_momentum:
-                all_rs_ratio.extend(self.rs_ratio[symbol].dropna().values)
-                all_rs_momentum.extend(self.rs_momentum[symbol].dropna().values)
+                rs_ratio_values = self.rs_ratio[symbol].dropna().values
+                rs_momentum_values = self.rs_momentum[symbol].dropna().values
+                
+                if len(rs_ratio_values) > 0 and len(rs_momentum_values) > 0:
+                    all_rs_ratio.extend(rs_ratio_values)
+                    all_rs_momentum.extend(rs_momentum_values)
+                    valid_symbols.append(symbol)
+        
+        if not all_rs_ratio or not all_rs_momentum:
+            print("Tidak cukup data untuk normalisasi")
+            return False
         
         # Menghitung mean dan standard deviation
         rs_ratio_mean = np.mean(all_rs_ratio)
@@ -119,11 +123,16 @@ class RRGAnalyzer:
         rs_momentum_mean = np.mean(all_rs_momentum)
         rs_momentum_std = np.std(all_rs_momentum)
         
+        if rs_ratio_std == 0 or rs_momentum_std == 0:
+            print("Standard deviasi nol, tidak dapat melakukan normalisasi")
+            return False
+        
         # Normalisasi dengan Z-score dan pindahkan mean ke 100
-        for symbol in self.stock_symbols:
-            if symbol in self.rs_ratio and symbol in self.rs_momentum:
-                self.rs_ratio_norm[symbol] = 100 + 10 * ((self.rs_ratio[symbol] - rs_ratio_mean) / rs_ratio_std)
-                self.rs_momentum_norm[symbol] = 100 + 10 * ((self.rs_momentum[symbol] - rs_momentum_mean) / rs_momentum_std)
+        for symbol in valid_symbols:
+            self.rs_ratio_norm[symbol] = 100 + 10 * ((self.rs_ratio[symbol] - rs_ratio_mean) / rs_ratio_std)
+            self.rs_momentum_norm[symbol] = 100 + 10 * ((self.rs_momentum[symbol] - rs_momentum_mean) / rs_momentum_std)
+        
+        return True
     
     def get_latest_data(self):
         """
@@ -133,7 +142,11 @@ class RRGAnalyzer:
         latest_data = []
         
         for symbol in self.stock_symbols:
-            if symbol in self.rs_ratio_norm and symbol in self.rs_momentum_norm:
+            if (symbol in self.rs_ratio_norm and 
+                symbol in self.rs_momentum_norm and 
+                not self.rs_ratio_norm[symbol].empty and 
+                not self.rs_momentum_norm[symbol].empty):
+                
                 rs_ratio = self.rs_ratio_norm[symbol].iloc[-1]
                 rs_momentum = self.rs_momentum_norm[symbol].iloc[-1]
                 
@@ -167,7 +180,7 @@ class RRGAnalyzer:
         :param title: judul grafik
         :param trail_length: panjang trail (berapa periode sebelumnya yang ditampilkan)
         """
-        fig, ax = plt.subplots(figsize=(12, 10))
+        fig, ax = plt.subplots(figsize=(10, 8))
         
         # Gambar garis sumbu
         ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
@@ -187,10 +200,23 @@ class RRGAnalyzer:
         
         # Plot data untuk setiap saham
         for symbol in self.stock_symbols:
-            if symbol in self.rs_ratio_norm and symbol in self.rs_momentum_norm:
+            if (symbol in self.rs_ratio_norm and 
+                symbol in self.rs_momentum_norm and 
+                not self.rs_ratio_norm[symbol].empty and 
+                not self.rs_momentum_norm[symbol].empty):
+                
                 # Dapatkan data terbaru dan trail
-                x_data = self.rs_ratio_norm[symbol].iloc[-trail_length:].values
-                y_data = self.rs_momentum_norm[symbol].iloc[-trail_length:].values
+                x_series = self.rs_ratio_norm[symbol].dropna()
+                y_series = self.rs_momentum_norm[symbol].dropna()
+                
+                if len(x_series) < 2 or len(y_series) < 2:
+                    continue
+                
+                x_data = x_series.iloc[-min(trail_length, len(x_series)):].values
+                y_data = y_series.iloc[-min(trail_length, len(y_series)):].values
+                
+                if len(x_data) < 2 or len(y_data) < 2:
+                    continue
                 
                 # Plot trail
                 ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
@@ -216,13 +242,19 @@ class RRGAnalyzer:
         plt.tight_layout()
         return fig
     
-    def analyze(self):
+    def analyze(self, rs_ratio_period=63, rs_momentum_period=21):
         """
         Jalankan analisis lengkap
         """
-        self.download_data()
-        self.calculate_rs_ratio()
-        self.calculate_rs_momentum()
-        self.normalize_data()
+        success = self.download_data()
+        if not success:
+            return None
+            
+        self.calculate_rs_ratio(period=rs_ratio_period)
+        self.calculate_rs_momentum(period=rs_momentum_period)
+        success = self.normalize_data()
         
+        if not success:
+            return None
+            
         return self.get_latest_data()
