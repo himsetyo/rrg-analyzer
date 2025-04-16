@@ -56,7 +56,7 @@ local_css()
 input_mode = st.sidebar.radio(
     "Pilih Sumber Data:",
     ["Bloomberg Excel", "File CSV Terpisah"],
-    index=0
+    index=1  # Default ke CSV untuk kasus Anda
 )
 
 # Sidebar untuk upload file dan input
@@ -96,7 +96,7 @@ if input_mode == "Bloomberg Excel":
 else:
     # Upload benchmark file CSV
     benchmark_file = st.sidebar.file_uploader(
-        "Upload file CSV Benchmark (contoh: IHSG.csv):",
+        "Upload file CSV Benchmark (contoh: LQ45.csv):",
         type=["csv"],
         help="File CSV dengan format: Date,Open,High,Low,Close,Volume"
     )
@@ -383,15 +383,18 @@ if analyze_button:
                         st.sidebar.write("Maksimal Tanggal:", max_date)
                     
                     # Preview data benchmark
-                    st.sidebar.subheader("Preview Benchmark")
-                    benchmark_preview = pd.read_csv(benchmark_temp)
-                    st.sidebar.write(benchmark_preview.head(3))
-                    
-                    # Preview data saham pertama
-                    if stock_files:
-                        st.sidebar.subheader(f"Preview {stock_files[0].name}")
-                        stock_preview = pd.read_csv(stock_temps[0])
-                        st.sidebar.write(stock_preview.head(3))
+                    try:
+                        st.sidebar.subheader("Preview Benchmark")
+                        benchmark_preview = pd.read_csv(benchmark_temp)
+                        st.sidebar.write(benchmark_preview.head(3))
+                        
+                        # Preview data saham pertama
+                        if stock_files:
+                            st.sidebar.subheader(f"Preview {stock_files[0].name}")
+                            stock_preview = pd.read_csv(stock_temps[0])
+                            st.sidebar.write(stock_preview.head(3))
+                    except Exception as e:
+                        st.sidebar.error(f"Error saat preview data: {str(e)}")
                 
                 # Jalankan analisis dengan progress bar
                 progress_text = "Menganalisis data saham..."
@@ -404,7 +407,7 @@ if analyze_button:
                 
                 # Step 2: Load data
                 my_bar.progress(30, text="Memuat data dari file CSV...")
-                success = analyzer.load_data_from_files()
+                success = analyzer.load_data_from_files()  # Pastikan menggunakan metode ini untuk CSV
                 if not success:
                     st.error("Gagal memuat data dari file. Periksa format file CSV Anda.")
                     my_bar.empty()
@@ -603,12 +606,12 @@ else:
         # Tampilkan contoh format file CSV
         with st.expander("📝 Format File CSV yang Diperlukan"):
             st.markdown("""
-            ### Format untuk Data Benchmark (misalnya: IHSG.csv)
+            ### Format untuk Data Benchmark (misalnya: LQ45.csv)
 
             ```csv
             Date,Open,High,Low,Close,Volume
-            2024-01-01,7100.5,7150.2,7095.6,7125.8,10500000
-            2024-01-02,7125.8,7180.4,7110.3,7160.7,11200000
+            01/01/2020,1022.344,1023.884,1014.473,1014.473,809234400
+            01/02/2020,1017.158,1017.52,1007.5,1011.618,612725900
             ...
             ```
 
@@ -616,14 +619,14 @@ else:
 
             ```csv
             Date,Open,High,Low,Close,Volume
-            2024-01-01,9500,9550,9475,9525,5000000
-            2024-01-02,9525,9600,9510,9590,5500000
+            01/01/2020,6675,6720,6670,6685,61168000
+            01/02/2020,6695,6780,6680,6690,49445000
             ...
             ```
 
             ### Catatan Penting Format:
             - **Header**: Wajib menggunakan header `Date,Open,High,Low,Close,Volume`
-            - **Format Tanggal**: Sebaiknya gunakan format YYYY-MM-DD (2024-01-01)
+            - **Format Tanggal**: Aplikasi mendukung format MM/DD/YYYY (01/01/2020) atau YYYY-MM-DD (2020-01-01)
             - **Pemisah Desimal**: Gunakan titik (.) bukan koma (,)
             - **Pemisah Kolom**: Gunakan koma (,) - format CSV standar
             - **Urutan Data**: Urutkan dari tanggal terlama ke terbaru (ascending)
