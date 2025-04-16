@@ -171,117 +171,117 @@ class RRGAnalyzer:
             return False
         
     def load_data_from_files(self):
-    """
-    Load data dari file CSV
-    """
-    if not self.benchmark_file:
-        print("File benchmark tidak ditemukan")
-        return False
-        
-    try:
-        # Load benchmark data
-        self.benchmark_data = pd.read_csv(self.benchmark_file)
-        
-        # Cek format tanggal dan konversi jika perlu
-        date_col = 'Date'
-        if date_col in self.benchmark_data.columns:
-            # Coba konversi tanggal
-            try:
-                # Pertama coba format default YYYY-MM-DD
-                self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col])
-            except:
+        """
+        Load data dari file CSV
+        """
+        if not self.benchmark_file:
+            print("File benchmark tidak ditemukan")
+            return False
+            
+        try:
+            # Load benchmark data
+            self.benchmark_data = pd.read_csv(self.benchmark_file)
+            
+            # Cek format tanggal dan konversi jika perlu
+            date_col = 'Date'
+            if date_col in self.benchmark_data.columns:
+                # Coba konversi tanggal
                 try:
-                    # Jika gagal, coba format MM/DD/YYYY
-                    self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col], format='%m/%d/%Y')
-                except Exception as e:
-                    print(f"Gagal mengkonversi format tanggal: {e}")
-                    return False
-                    
-            self.benchmark_data.set_index(date_col, inplace=True)
-            self.benchmark_data.sort_index(inplace=True)
-        else:
-            print("Kolom 'Date' tidak ditemukan di file benchmark")
-            return False
-        
-        # Filter berdasarkan max_date
-        self.benchmark_data = self.benchmark_data[self.benchmark_data.index <= self.max_date]
-        
-        if self.benchmark_data.empty:
-            print("Data benchmark kosong")
-            return False
-            
-        # Filter data berdasarkan periode tahun
-        if self.period_years > 0:
-            end_date = self.benchmark_data.index.max()
-            start_date = end_date - pd.DateOffset(years=self.period_years)
-            self.benchmark_data = self.benchmark_data.loc[start_date:end_date]
-        
-        # Load stock data
-        load_success = False
-        self.stock_symbols = []  # Reset daftar symbol
-        for file_path in self.stock_files:
-            try:
-                # Extract symbol dari nama file
-                symbol = os.path.splitext(os.path.basename(file_path))[0]
-                
-                # Load data
-                stock_data = pd.read_csv(file_path)
-                
-                # Cek dan konversi format tanggal jika perlu
-                if date_col in stock_data.columns:
+                    # Pertama coba format default YYYY-MM-DD
+                    self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col])
+                except:
                     try:
-                        # Pertama coba format default YYYY-MM-DD
-                        stock_data[date_col] = pd.to_datetime(stock_data[date_col])
-                    except:
-                        try:
-                            # Jika gagal, coba format MM/DD/YYYY
-                            stock_data[date_col] = pd.to_datetime(stock_data[date_col], format='%m/%d/%Y')
-                        except Exception as e:
-                            print(f"Gagal mengkonversi format tanggal untuk {symbol}: {e}")
-                            continue
-                            
-                    stock_data.set_index(date_col, inplace=True)
-                    stock_data.sort_index(inplace=True)
-                else:
-                    print(f"Kolom 'Date' tidak ditemukan di file {symbol}")
-                    continue
-                
-                # Filter berdasarkan max_date
-                stock_data = stock_data[stock_data.index <= self.max_date]
-                
-                # Filter data berdasarkan periode tahun
-                if self.period_years > 0 and not self.benchmark_data.empty:
-                    # Gunakan periode yang sama dengan benchmark
-                    start_date = self.benchmark_data.index.min()
-                    end_date = self.benchmark_data.index.max()
-                    if start_date in stock_data.index and end_date in stock_data.index:
-                        stock_data = stock_data.loc[start_date:end_date]
-                    else:
-                        # Filter dengan periode yang ada
-                        stock_end_date = stock_data.index.max()
-                        stock_start_date = stock_end_date - pd.DateOffset(years=self.period_years)
-                        stock_data = stock_data.loc[stock_start_date:stock_end_date]
-                
-                # Simpan data dan tambahkan symbol
-                if not stock_data.empty:
-                    self.stock_data[symbol] = stock_data
-                    self.stock_symbols.append(symbol)
-                    load_success = True
-                else:
-                    print(f"Data kosong untuk {symbol}")
-                    
-            except Exception as e:
-                print(f"Error saat memuat data untuk {file_path}: {str(e)}")
-                import traceback
-                traceback.print_exc()
-        
-        return load_success
+                        # Jika gagal, coba format MM/DD/YYYY
+                        self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col], format='%m/%d/%Y')
+                    except Exception as e:
+                        print(f"Gagal mengkonversi format tanggal: {e}")
+                        return False
+                        
+                self.benchmark_data.set_index(date_col, inplace=True)
+                self.benchmark_data.sort_index(inplace=True)
+            else:
+                print("Kolom 'Date' tidak ditemukan di file benchmark")
+                return False
             
-    except Exception as e:
-        print(f"Error saat memuat data dari file: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
+            # Filter berdasarkan max_date
+            self.benchmark_data = self.benchmark_data[self.benchmark_data.index <= self.max_date]
+            
+            if self.benchmark_data.empty:
+                print("Data benchmark kosong")
+                return False
+                
+            # Filter data berdasarkan periode tahun
+            if self.period_years > 0:
+                end_date = self.benchmark_data.index.max()
+                start_date = end_date - pd.DateOffset(years=self.period_years)
+                self.benchmark_data = self.benchmark_data.loc[start_date:end_date]
+            
+            # Load stock data
+            load_success = False
+            self.stock_symbols = []  # Reset daftar symbol
+            for file_path in self.stock_files:
+                try:
+                    # Extract symbol dari nama file
+                    symbol = os.path.splitext(os.path.basename(file_path))[0]
+                    
+                    # Load data
+                    stock_data = pd.read_csv(file_path)
+                    
+                    # Cek dan konversi format tanggal jika perlu
+                    if date_col in stock_data.columns:
+                        try:
+                            # Pertama coba format default YYYY-MM-DD
+                            stock_data[date_col] = pd.to_datetime(stock_data[date_col])
+                        except:
+                            try:
+                                # Jika gagal, coba format MM/DD/YYYY
+                                stock_data[date_col] = pd.to_datetime(stock_data[date_col], format='%m/%d/%Y')
+                            except Exception as e:
+                                print(f"Gagal mengkonversi format tanggal untuk {symbol}: {e}")
+                                continue
+                                
+                        stock_data.set_index(date_col, inplace=True)
+                        stock_data.sort_index(inplace=True)
+                    else:
+                        print(f"Kolom 'Date' tidak ditemukan di file {symbol}")
+                        continue
+                    
+                    # Filter berdasarkan max_date
+                    stock_data = stock_data[stock_data.index <= self.max_date]
+                    
+                    # Filter data berdasarkan periode tahun
+                    if self.period_years > 0 and not self.benchmark_data.empty:
+                        # Gunakan periode yang sama dengan benchmark
+                        start_date = self.benchmark_data.index.min()
+                        end_date = self.benchmark_data.index.max()
+                        if start_date in stock_data.index and end_date in stock_data.index:
+                            stock_data = stock_data.loc[start_date:end_date]
+                        else:
+                            # Filter dengan periode yang ada
+                            stock_end_date = stock_data.index.max()
+                            stock_start_date = stock_end_date - pd.DateOffset(years=self.period_years)
+                            stock_data = stock_data.loc[stock_start_date:stock_end_date]
+                    
+                    # Simpan data dan tambahkan symbol
+                    if not stock_data.empty:
+                        self.stock_data[symbol] = stock_data
+                        self.stock_symbols.append(symbol)
+                        load_success = True
+                    else:
+                        print(f"Data kosong untuk {symbol}")
+                        
+                except Exception as e:
+                    print(f"Error saat memuat data untuk {file_path}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+            
+            return load_success
+                
+        except Exception as e:
+            print(f"Error saat memuat data dari file: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
         
     def calculate_rs_ratio(self, period=63):
         """
