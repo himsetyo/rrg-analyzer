@@ -73,13 +73,13 @@ col1, col2 = st.sidebar.columns(2)
 with col1:
     period_years = st.number_input("Periode Data (tahun):", 0.5, 10.0, 3.0, step=0.5)
 with col2:
-    trail_length = st.number_input("Panjang Trail:", 1, 20, 8, help="Jumlah periode terakhir yang ditampilkan pada grafik")
+    trail_length = st.number_input("Panjang Trail:", 1, 20, 12, help="Jumlah periode terakhir yang ditampilkan pada grafik")
 
 col3, col4 = st.sidebar.columns(2)
 with col3:
-    rs_ratio_period = st.number_input("Periode RS-Ratio:", 5, 100, 63, help="Periode untuk perhitungan RS-Ratio (hari trading)")
+    rs_ratio_period = st.number_input("Periode RS-Ratio:", 5, 100, 52, help="Periode untuk perhitungan RS-Ratio (trading mingguan)")
 with col4:
-    rs_momentum_period = st.number_input("Periode RS-Momentum:", 3, 60, 21, help="Periode untuk perhitungan RS-Momentum (hari trading)")
+    rs_momentum_period = st.number_input("Periode RS-Momentum:", 3, 60, 26, help="Periode untuk perhitungan RS-Momentum (trading mingguan)")
 
 # Debug mode
 debug_mode = st.sidebar.checkbox("Mode Debug", True)
