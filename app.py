@@ -25,29 +25,12 @@ except Exception as e:
 st.title("📊 Relative Rotation Graph (RRG) Analyzer")
 
 st.markdown("""
-Aplikasi ini menganalisis kinerja relatif saham-saham dalam portofolio Anda 
-dibandingkan dengan benchmark menggunakan metode Relative Rotation Graph (RRG).
+Aplikasi ini menganalisis kinerja relatif saham-saham dalam portofolio Anda dibandingkan dengan benchmark menggunakan metode Relative Rotation Graph (RRG).
 """)
 
 # Styling
 def local_css():
     st.markdown("""
-    <style>
-        .stApp {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        h1 {
-            color: #0066cc;
-        }
-        .stButton>button {
-            width: 100%;
-        }
-    </style>
     """, unsafe_allow_html=True)
 
 local_css()
@@ -92,7 +75,7 @@ if input_mode == "Bloomberg Excel":
         "BBCA IJ Equity\nBBRI IJ Equity\nTLKM IJ Equity\nASII IJ Equity\nUNVR IJ Equity",
         help="Masukkan ticker saham persis seperti di Excel (contoh: 'BBCA IJ Equity')"
     )
-    
+
 else:
     # Upload benchmark file CSV
     benchmark_file = st.sidebar.file_uploader(
@@ -100,7 +83,7 @@ else:
         type=["csv"],
         help="File CSV dengan format: Date,Open,High,Low,Close,Volume"
     )
-
+    
     # Upload stock files CSV
     stock_files = st.sidebar.file_uploader(
         "Upload file CSV Saham (multiple files):",
@@ -113,8 +96,7 @@ else:
 st.sidebar.header("Parameter Analisis")
 
 # Maksimal tanggal analisis
-use_max_date = st.sidebar.checkbox("Batasi Tanggal Analisis", value=False, 
-                                 help="Aktifkan untuk membatasi analisis hingga tanggal tertentu")
+use_max_date = st.sidebar.checkbox("Batasi Tanggal Analisis", value=False, help="Aktifkan untuk membatasi analisis hingga tanggal tertentu")
 if use_max_date:
     max_date = st.sidebar.date_input(
         "Maksimal Tanggal Analisis:",
@@ -154,12 +136,11 @@ else:
 with st.sidebar.expander("ℹ️ Tentang RRG"):
     st.write("""
     **Interpretasi Kuadran:**
-
     - **Leading (Kanan Atas)**: Saham dengan kekuatan relatif dan momentum positif. Rekomendasi: Hold/Buy
     - **Weakening (Kanan Bawah)**: Saham dengan kekuatan relatif tinggi tapi momentum menurun. Rekomendasi: Hold/Take Profit
     - **Lagging (Kiri Bawah)**: Saham dengan kekuatan relatif rendah dan momentum negatif. Rekomendasi: Sell/Cut Loss
     - **Improving (Kiri Atas)**: Saham dengan kekuatan relatif rendah tapi momentum meningkat. Rekomendasi: Accumulate/Buy Carefully
-    
+
     **Cara Membaca:**
     - Posisi pada grafik menunjukkan kinerja relatif dan momentum saham terhadap benchmark
     - Trail menunjukkan pergerakan saham selama beberapa periode terakhir
@@ -180,11 +161,10 @@ if analyze_button:
         
         # Parse input ticker
         stock_tickers = [ticker.strip() for ticker in stock_tickers_input.split("\n") if ticker.strip()]
-        
         if not stock_tickers:
             st.error("Silakan masukkan setidaknya satu ticker saham.")
             st.stop()
-            
+        
         # Simpan file ke temporary file
         excel_temp = save_uploaded_file(excel_file)
         
@@ -204,9 +184,13 @@ if analyze_button:
             
             # Step 1: Inisialisasi
             my_bar.progress(10, text="Inisialisasi analisis...")
-            analyzer = RRGAnalyzer(excel_file=excel_temp, benchmark_ticker=benchmark_ticker, 
-                                  stock_tickers=stock_tickers, period_years=period_years,
-                                  max_date=max_date)
+            analyzer = RRGAnalyzer(
+                excel_file=excel_temp,
+                benchmark_ticker=benchmark_ticker,
+                stock_tickers=stock_tickers,
+                period_years=period_years,
+                max_date=max_date
+            )
             
             # Step 2: Load data
             my_bar.progress(30, text="Memuat data dari Excel Bloomberg...")
@@ -332,7 +316,7 @@ if analyze_button:
                             st.markdown(f"- {stock}")
                     else:
                         st.markdown("*Tidak ada saham pada kuadran ini*")
-                        
+                
                 with col_weakening:
                     st.markdown("### Weakening ⚠️")
                     weakening_stocks = results[results['Quadrant'] == 'Weakening']['Symbol'].tolist()
@@ -350,20 +334,20 @@ if analyze_button:
                             st.markdown(f"- {stock}")
                     else:
                         st.markdown("*Tidak ada saham pada kuadran ini*")
-        
+                
         except Exception as e:
             st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
-            
             if debug_mode:
                 st.error(f"Detail error: {str(e)}")
                 import traceback
                 st.code(traceback.format_exc())
-                
+            
             # Clean up temp file
             if 'excel_temp' in locals():
                 os.unlink(excel_temp)
-            
-    else:  # File CSV Terpisah
+    
+    else:
+        # File CSV Terpisah
         if benchmark_file is None:
             st.error("Silakan upload file benchmark terlebih dahulu.")
         elif not stock_files:
@@ -402,8 +386,12 @@ if analyze_button:
                 
                 # Step 1: Inisialisasi
                 my_bar.progress(10, text="Inisialisasi analisis...")
-                analyzer = RRGAnalyzer(benchmark_file=benchmark_temp, stock_files=stock_temps, 
-                                     period_years=period_years, max_date=max_date)
+                analyzer = RRGAnalyzer(
+                    benchmark_file=benchmark_temp,
+                    stock_files=stock_temps,
+                    period_years=period_years,
+                    max_date=max_date
+                )
                 
                 # Step 2: Load data
                 my_bar.progress(30, text="Memuat data dari file CSV...")
@@ -539,7 +527,7 @@ if analyze_button:
                                 st.markdown(f"- {stock}")
                         else:
                             st.markdown("*Tidak ada saham pada kuadran ini*")
-                            
+                    
                     with col_weakening:
                         st.markdown("### Weakening ⚠️")
                         weakening_stocks = results[results['Quadrant'] == 'Weakening']['Symbol'].tolist()
@@ -557,21 +545,21 @@ if analyze_button:
                                 st.markdown(f"- {stock}")
                         else:
                             st.markdown("*Tidak ada saham pada kuadran ini*")
-            
+                
             except Exception as e:
                 st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
-                
                 if debug_mode:
                     st.error(f"Detail error: {str(e)}")
                     import traceback
                     st.code(traceback.format_exc())
-                    
+                
                 # Clean up temp files
                 if 'benchmark_temp' in locals():
                     os.unlink(benchmark_temp)
                 if 'stock_temps' in locals():
                     for temp_file in stock_temps:
                         os.unlink(temp_file)
+
 else:
     # Tampilkan info default ketika aplikasi pertama kali dibuka
     if input_mode == "Bloomberg Excel":
@@ -594,7 +582,6 @@ else:
                - PX_VOLUME (Volume)
             
             ### Contoh Data Ticker yang Didukung:
-            
             - Untuk Benchmark: "JCI Index", "LQ45 Index"
             - Untuk Saham: "BBCA IJ Equity", "ASII IJ Equity", dll.
             
@@ -602,30 +589,31 @@ else:
             """)
     else:
         st.info("👈 Upload file CSV di panel sebelah kiri dan atur parameter, lalu klik 'Jalankan Analisis'.")
-    
+        
         # Tampilkan contoh format file CSV
         with st.expander("📝 Format File CSV yang Diperlukan"):
             st.markdown("""
             ### Format untuk Data Benchmark (misalnya: LQ45.csv)
-
+            
             ```csv
-            Date,Open,High,Low,Close,Volume
-            01/01/2020,1022.344,1023.884,1014.473,1014.473,809234400
-            01/02/2020,1017.158,1017.52,1007.5,1011.618,612725900
+            Ticker,Date,Open,High,Low,Close,Volume
+            LQ45,01/01/2020,1022.344,1023.884,1014.473,1014.473,809234400
+            LQ45,01/02/2020,1017.158,1017.52,1007.5,1011.618,612725900
             ...
             ```
-
+            
             ### Format untuk Data Saham (misalnya: BBCA.csv)
-
+            
             ```csv
-            Date,Open,High,Low,Close,Volume
-            01/01/2020,6675,6720,6670,6685,61168000
-            01/02/2020,6695,6780,6680,6690,49445000
+            Ticker,Date,Open,High,Low,Close,Volume
+            BBCA,01/01/2020,6675,6720,6670,6685,61168000
+            BBCA,01/02/2020,6695,6780,6680,6690,49445000
             ...
             ```
-
+            
             ### Catatan Penting Format:
-            - **Header**: Wajib menggunakan header `Date,Open,High,Low,Close,Volume`
+            - **Header**: Wajib menggunakan header yang sesuai dengan kolom data
+            - **Kolom Ticker**: Sebaiknya disertakan untuk menampilkan nama ticker yang benar pada grafik
             - **Format Tanggal**: Aplikasi mendukung format MM/DD/YYYY (01/01/2020) atau YYYY-MM-DD (2020-01-01)
             - **Pemisah Desimal**: Gunakan titik (.) bukan koma (,)
             - **Pemisah Kolom**: Gunakan koma (,) - format CSV standar

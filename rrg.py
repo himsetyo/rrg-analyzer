@@ -6,8 +6,7 @@ import os
 import re
 
 class RRGAnalyzer:
-    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, 
-                 benchmark_file=None, stock_files=None, period_years=3, max_date=None):
+    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, benchmark_file=None, stock_files=None, period_years=3, max_date=None):
         """
         Inisialisasi analyzer RRG
         :param excel_file: path file Excel dari Bloomberg
@@ -34,7 +33,7 @@ class RRGAnalyzer:
                 self.max_date = datetime.now()
         else:
             self.max_date = max_date if max_date else datetime.now()
-            
+        
         self.benchmark_data = None
         self.stock_data = {}
         self.stock_symbols = []
@@ -42,6 +41,7 @@ class RRGAnalyzer:
         self.rs_momentum = {}
         self.rs_ratio_norm = {}
         self.rs_momentum_norm = {}
+        self.ticker_map = {}  # Untuk menyimpan mapping ticker asli dari file CSV
         
     def load_data_from_bloomberg_excel(self):
         """
@@ -50,7 +50,7 @@ class RRGAnalyzer:
         if not self.excel_file or not self.benchmark_ticker or not self.stock_tickers:
             print("File Excel, benchmark ticker atau stock tickers tidak valid")
             return False
-            
+        
         try:
             # Baca seluruh file Excel
             df = pd.read_excel(self.excel_file, header=None)
@@ -64,7 +64,7 @@ class RRGAnalyzer:
             else:
                 print("Format data tidak ditemukan")
                 return False
-                
+            
             # Tentukan apakah header adalah "Dates" atau tanggal langsung
             if isinstance(df.iloc[start_row, 0], str) and df.iloc[start_row, 0].lower() == 'dates':
                 # Header found, data starts on the next row
@@ -87,11 +87,12 @@ class RRGAnalyzer:
                     if ticker_pattern.search(cell_value):
                         # Simpan informasi kolom (kita butuh 5 kolom berturut-turut untuk OHLCV)
                         base_col = col
+                        
                         # Periksa 5 kolom berikutnya untuk memastikan mereka adalah OHLCV
                         ticker_columns[ticker] = {
-                            'open': base_col,      # PX_OPEN
-                            'high': base_col + 1,  # PX_HIGH
-                            'low': base_col + 2,   # PX_LOW
+                            'open': base_col,     # PX_OPEN
+                            'high': base_col + 1, # PX_HIGH
+                            'low': base_col + 2,  # PX_LOW
                             'close': base_col + 3, # PX_LAST
                             'volume': base_col + 4 # PX_VOLUME
                         }
@@ -154,6 +155,7 @@ class RRGAnalyzer:
                     
                     # Simpan data saham
                     self.stock_data[ticker] = stock_data
+                    
                     # Tambahkan ke daftar simbol
                     self.stock_symbols.append(ticker)
             
@@ -161,15 +163,15 @@ class RRGAnalyzer:
             if not self.stock_data:
                 print("Tidak ada data saham yang berhasil dimuat")
                 return False
-                
+            
             return True
-                
+        
         except Exception as e:
             print(f"Error saat memuat data dari file Excel: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
-        
+    
     def load_data_from_files(self):
         """
         Load data dari file CSV
@@ -177,7 +179,7 @@ class RRGAnalyzer:
         if not self.benchmark_file:
             print("File benchmark tidak ditemukan")
             return False
-            
+        
         try:
             # Load benchmark data
             self.benchmark_data = pd.read_csv(self.benchmark_file)
@@ -196,12 +198,21 @@ class RRGAnalyzer:
                     except Exception as e:
                         print(f"Gagal mengkonversi format tanggal: {e}")
                         return False
-                        
+                
                 self.benchmark_data.set_index(date_col, inplace=True)
                 self.benchmark_data.sort_index(inplace=True)
             else:
                 print("Kolom 'Date' tidak ditemukan di file benchmark")
                 return False
+            
+            # Ekstrak ticker dari data benchmark
+            if 'Ticker' in self.benchmark_data.columns:
+                benchmark_ticker_value = self.benchmark_data['Ticker'].iloc[0]
+                self.benchmark_ticker = benchmark_ticker_value
+            else:
+                # Jika tidak ada kolom Ticker, gunakan nama file sebagai ticker
+                benchmark_basename = os.path.splitext(os.path.basename(self.benchmark_file))[0]
+                self.benchmark_ticker = benchmark_basename
             
             # Filter berdasarkan max_date
             self.benchmark_data = self.benchmark_data[self.benchmark_data.index <= self.max_date]
@@ -209,7 +220,7 @@ class RRGAnalyzer:
             if self.benchmark_data.empty:
                 print("Data benchmark kosong")
                 return False
-                
+            
             # Filter data berdasarkan periode tahun
             if self.period_years > 0:
                 end_date = self.benchmark_data.index.max()
@@ -219,10 +230,12 @@ class RRGAnalyzer:
             # Load stock data
             load_success = False
             self.stock_symbols = []  # Reset daftar symbol
+            self.ticker_map = {}  # Reset ticker map
+            
             for file_path in self.stock_files:
                 try:
                     # Extract symbol dari nama file
-                    symbol = os.path.splitext(os.path.basename(file_path))[0]
+                    file_symbol = os.path.splitext(os.path.basename(file_path))[0]
                     
                     # Load data
                     stock_data = pd.read_csv(file_path)
@@ -237,14 +250,26 @@ class RRGAnalyzer:
                                 # Jika gagal, coba format MM/DD/YYYY
                                 stock_data[date_col] = pd.to_datetime(stock_data[date_col], format='%m/%d/%Y')
                             except Exception as e:
-                                print(f"Gagal mengkonversi format tanggal untuk {symbol}: {e}")
+                                print(f"Gagal mengkonversi format tanggal untuk {file_symbol}: {e}")
                                 continue
-                                
+                        
                         stock_data.set_index(date_col, inplace=True)
                         stock_data.sort_index(inplace=True)
                     else:
-                        print(f"Kolom 'Date' tidak ditemukan di file {symbol}")
+                        print(f"Kolom 'Date' tidak ditemukan di file {file_symbol}")
                         continue
+                    
+                    # Dapatkan ticker dari file jika ada
+                    if 'Ticker' in stock_data.columns:
+                        # Gunakan ticker dari kolom Ticker file CSV
+                        ticker_from_csv = stock_data['Ticker'].iloc[0]
+                        symbol = ticker_from_csv
+                        # Simpan mapping untuk referensi
+                        self.ticker_map[file_symbol] = ticker_from_csv
+                    else:
+                        # Gunakan nama file sebagai ticker
+                        symbol = file_symbol
+                        self.ticker_map[file_symbol] = file_symbol
                     
                     # Filter berdasarkan max_date
                     stock_data = stock_data[stock_data.index <= self.max_date]
@@ -254,6 +279,7 @@ class RRGAnalyzer:
                         # Gunakan periode yang sama dengan benchmark
                         start_date = self.benchmark_data.index.min()
                         end_date = self.benchmark_data.index.max()
+                        
                         if start_date in stock_data.index and end_date in stock_data.index:
                             stock_data = stock_data.loc[start_date:end_date]
                         else:
@@ -264,25 +290,25 @@ class RRGAnalyzer:
                     
                     # Simpan data dan tambahkan symbol
                     if not stock_data.empty:
-                        self.stock_data[symbol] = stock_data
-                        self.stock_symbols.append(symbol)
+                        self.stock_data[file_symbol] = stock_data
+                        self.stock_symbols.append(file_symbol)
                         load_success = True
                     else:
-                        print(f"Data kosong untuk {symbol}")
-                        
+                        print(f"Data kosong untuk {file_symbol}")
+                
                 except Exception as e:
                     print(f"Error saat memuat data untuk {file_path}: {str(e)}")
                     import traceback
                     traceback.print_exc()
             
             return load_success
-                
+        
         except Exception as e:
             print(f"Error saat memuat data dari file: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
-        
+    
     def calculate_rs_ratio(self, period=63):
         """
         Menghitung Relative Strength Ratio (RS-Ratio)
@@ -315,7 +341,7 @@ class RRGAnalyzer:
             
             if len(rs_ratio) > 0:
                 self.rs_ratio[ticker] = rs_ratio
-            
+    
     def calculate_rs_momentum(self, period=21):
         """
         Menghitung Relative Strength Momentum (RS-Momentum)
@@ -329,7 +355,7 @@ class RRGAnalyzer:
             if len(rs_ratio_series) <= period:
                 print(f"Data tidak cukup untuk menghitung momentum {ticker}")
                 continue
-                
+            
             # Hitung pct_change dengan fill_method=None untuk menghindari warning
             # Dan pastikan tidak ada NaN
             rs_momentum = rs_ratio_series.pct_change(periods=period, fill_method=None) * 100
@@ -337,7 +363,7 @@ class RRGAnalyzer:
             
             if len(rs_momentum) > 0:
                 self.rs_momentum[ticker] = rs_momentum
-            
+    
     def normalize_data(self):
         """
         Normalisasi data RS-Ratio dan RS-Momentum
@@ -349,8 +375,8 @@ class RRGAnalyzer:
         # Mengumpulkan semua nilai RS-Ratio dan RS-Momentum yang valid
         all_rs_ratio = []
         all_rs_momentum = []
-        
         valid_tickers = []
+        
         for ticker in list(self.rs_ratio.keys()):
             if ticker in self.rs_momentum:
                 rs_ratio_values = self.rs_ratio[ticker].dropna().values
@@ -364,7 +390,7 @@ class RRGAnalyzer:
         if not valid_tickers:
             print("Tidak ada ticker valid dengan data lengkap")
             return False
-            
+        
         if len(all_rs_ratio) < 2 or len(all_rs_momentum) < 2:
             print("Tidak cukup data untuk normalisasi")
             return False
@@ -396,7 +422,7 @@ class RRGAnalyzer:
         if not self.rs_ratio_norm:
             print("Hasil normalisasi kosong")
             return False
-            
+        
         return True
     
     def get_latest_data(self):
@@ -430,8 +456,11 @@ class RRGAnalyzer:
                     quadrant = "Improving"
                     recommendation = "Accumulate/Buy Carefully"
                 
+                # Gunakan ticker yang sebenarnya dari data CSV jika tersedia
+                display_name = self.ticker_map.get(ticker, ticker)
+                
                 latest_data.append({
-                    'Symbol': ticker,
+                    'Symbol': display_name,
                     'RS-Ratio': rs_ratio,
                     'RS-Momentum': rs_momentum,
                     'Quadrant': quadrant,
@@ -455,8 +484,8 @@ class RRGAnalyzer:
         # Tambahkan latar belakang kuadran
         ax.fill_between([100, 120], 100, 120, color='green', alpha=0.1)  # Leading
         ax.fill_between([100, 120], 80, 100, color='yellow', alpha=0.1)  # Weakening
-        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)      # Lagging
-        ax.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)    # Improving
+        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)     # Lagging
+        ax.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)   # Improving
         
         # Tambahkan label kuadran
         ax.text(110, 110, 'LEADING', fontsize=12, ha='center')
@@ -482,25 +511,26 @@ class RRGAnalyzer:
                 # Plot trail jika ada cukup data
                 if len(x_data) >= 2 and len(y_data) >= 2:
                     ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
-                    
-                    # Plot titik terbaru (hanya jika ada data)
-                    ax.scatter(x_data[-1], y_data[-1], s=50)
-                    
-                    # Tampilkan label ticker yang lebih bersih
-                    # Jika ticker berakhir dengan " Index" atau " Equity", hapus itu
-                    display_name = ticker
-                    if " Index" in display_name:
-                        display_name = display_name.replace(" Index", "")
-                    elif " Equity" in display_name:
-                        display_name = display_name.replace(" Equity", "")
-                        
-                    # Jika masih terlalu panjang, potong ke 8 karakter
-                    if len(display_name) > 8:
-                        display_name = display_name[:8]
-                        
-                    # Tampilkan label
-                    ax.annotate(display_name, (x_data[-1], y_data[-1]), 
-                                 xytext=(5, 5), textcoords='offset points')
+                
+                # Plot titik terbaru (hanya jika ada data)
+                ax.scatter(x_data[-1], y_data[-1], s=50)
+                
+                # Tampilkan label ticker yang lebih bersih
+                # Gunakan ticker dari file CSV jika tersedia
+                display_name = self.ticker_map.get(ticker, ticker)
+                
+                # Jika ticker berakhir dengan " Index" atau " Equity", hapus itu
+                if " Index" in display_name:
+                    display_name = display_name.replace(" Index", "")
+                elif " Equity" in display_name:
+                    display_name = display_name.replace(" Equity", "")
+                
+                # Jika masih terlalu panjang, potong ke 8 karakter
+                if len(display_name) > 8:
+                    display_name = display_name[:8]
+                
+                # Tampilkan label
+                ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
         
         # Set batas dan label
         ax.set_xlim(80, 120)
@@ -538,42 +568,42 @@ class RRGAnalyzer:
         if rs_ratio_period <= 0 or rs_momentum_period <= 0:
             print("Periode harus positif")
             return None
-            
+        
         # Load data
         if self.excel_file:
             success = self.load_data_from_bloomberg_excel()
         else:
             success = self.load_data_from_files()
-            
+        
         if not success:
             print("Gagal memuat data")
             return None
-            
+        
         # Hitung RRG
         self.calculate_rs_ratio(period=rs_ratio_period)
         if not self.rs_ratio:
             print("Gagal menghitung RS-Ratio")
             return None
-            
+        
         self.calculate_rs_momentum(period=rs_momentum_period)
         if not self.rs_momentum:
             print("Gagal menghitung RS-Momentum")
             return None
-            
+        
         # Normalisasi
         success = self.normalize_data()
         if not success:
             print("Gagal melakukan normalisasi data")
             return None
-            
+        
         # Get latest data
         result = self.get_latest_data()
         if result.empty:
             print("Tidak ada hasil analisis")
             return None
-            
-        return result
         
+        return result
+    
     def get_analysis_date(self):
         """
         Mendapatkan tanggal analisis (tanggal maksimal yang digunakan)
