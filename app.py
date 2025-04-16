@@ -926,3 +926,7 @@ else:
             - **Pemisah Kolom**: Gunakan koma (,) - format CSV standar
             - **Urutan Data**: Urutkan dari tanggal terlama ke terbaru (ascending)
             """)
+
+# Footer
+st.markdown("---")
+st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
