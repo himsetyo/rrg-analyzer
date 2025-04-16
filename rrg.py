@@ -433,8 +433,8 @@ class RRGAnalyzer:
                 ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
         
         # Set batas dan label
-        ax.set_xlim(80, 120)
-        ax.set_ylim(80, 120)
+        ax.set_xlim(80, 130)
+        ax.set_ylim(80, 130)
         ax.grid(True, alpha=0.3)
         ax.set_xlabel('RS-Ratio (Relative Strength)')
         ax.set_ylabel('RS-Momentum')
