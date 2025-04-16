@@ -4,5 +4,3 @@ numpy
 matplotlib
 yfinance
 setuptools
-openpyxl
-xlrd

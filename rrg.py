@@ -6,20 +6,14 @@ import os
 import re
 
 class RRGAnalyzer:
-    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, benchmark_file=None, stock_files=None, period_years=3, max_date=None):
+    def __init__(self, benchmark_file=None, stock_files=None, period_years=3, max_date=None):
         """
         Inisialisasi analyzer RRG
-        :param excel_file: path file Excel dari Bloomberg
-        :param benchmark_ticker: ticker benchmark (misalnya "JCI Index")
-        :param stock_tickers: list ticker saham untuk analisis
-        :param benchmark_file: path file CSV benchmark (untuk mode CSV)
-        :param stock_files: list path file CSV saham (untuk mode CSV)
+        :param benchmark_file: path file CSV benchmark
+        :param stock_files: list path file CSV saham
         :param period_years: periode tahun data yang akan diambil
         :param max_date: tanggal maksimal untuk analisis (datetime atau string 'YYYY-MM-DD')
         """
-        self.excel_file = excel_file
-        self.benchmark_ticker = benchmark_ticker
-        self.stock_tickers = stock_tickers if stock_tickers else []
         self.benchmark_file = benchmark_file
         self.stock_files = stock_files if stock_files else []
         self.period_years = period_years
@@ -42,135 +36,6 @@ class RRGAnalyzer:
         self.rs_ratio_norm = {}
         self.rs_momentum_norm = {}
         self.ticker_map = {}  # Untuk menyimpan mapping ticker asli dari file CSV
-        
-    def load_data_from_bloomberg_excel(self):
-        """
-        Load data dari file Excel Bloomberg
-        """
-        if not self.excel_file or not self.benchmark_ticker or not self.stock_tickers:
-            print("File Excel, benchmark ticker atau stock tickers tidak valid")
-            return False
-        
-        try:
-            # Baca seluruh file Excel
-            df = pd.read_excel(self.excel_file, header=None)
-            
-            # Find the relevant data rows (starting after the second table header)
-            # Biasanya data dimulai setelah baris header "Dates"
-            for i, row in df.iterrows():
-                if isinstance(row[0], datetime) or (isinstance(row[0], str) and row[0].lower() == 'dates'):
-                    start_row = i
-                    break
-            else:
-                print("Format data tidak ditemukan")
-                return False
-            
-            # Tentukan apakah header adalah "Dates" atau tanggal langsung
-            if isinstance(df.iloc[start_row, 0], str) and df.iloc[start_row, 0].lower() == 'dates':
-                # Header found, data starts on the next row
-                data_start_row = start_row + 1
-                date_col = 0
-            else:
-                # No header, this row already contains dates
-                data_start_row = start_row
-                date_col = 0
-            
-            # Temukan kolom untuk ticker yang diperlukan
-            ticker_columns = {}
-            for ticker in [self.benchmark_ticker] + self.stock_tickers:
-                ticker_pattern = re.compile(f"{re.escape(ticker)}\\s*$", re.IGNORECASE)
-                
-                # Cari kolom PX_LAST (Close) untuk ticker
-                found = False
-                for col in range(len(df.columns)):
-                    cell_value = str(df.iloc[data_start_row-1, col]) if data_start_row > 0 else ""
-                    if ticker_pattern.search(cell_value):
-                        # Simpan informasi kolom (kita butuh 5 kolom berturut-turut untuk OHLCV)
-                        base_col = col
-                        
-                        # Periksa 5 kolom berikutnya untuk memastikan mereka adalah OHLCV
-                        ticker_columns[ticker] = {
-                            'open': base_col,     # PX_OPEN
-                            'high': base_col + 1, # PX_HIGH
-                            'low': base_col + 2,  # PX_LOW
-                            'close': base_col + 3, # PX_LAST
-                            'volume': base_col + 4 # PX_VOLUME
-                        }
-                        found = True
-                        break
-                
-                if not found:
-                    print(f"Ticker {ticker} tidak ditemukan di file Excel")
-                    if ticker == self.benchmark_ticker:
-                        # Jika benchmark tidak ditemukan, kita tidak bisa melanjutkan
-                        return False
-            
-            # Proses data untuk benchmark
-            if self.benchmark_ticker in ticker_columns:
-                cols = ticker_columns[self.benchmark_ticker]
-                
-                # Extract date and OHLCV data untuk benchmark
-                benchmark_data = df.iloc[data_start_row:, [date_col, cols['open'], cols['high'], cols['low'], cols['close'], cols['volume']]]
-                benchmark_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-                
-                # Konversi data ke format yang diperlukan
-                benchmark_data['Date'] = pd.to_datetime(benchmark_data['Date'])
-                benchmark_data = benchmark_data.set_index('Date')
-                benchmark_data = benchmark_data.apply(pd.to_numeric, errors='coerce')
-                
-                # Filter berdasarkan max_date
-                benchmark_data = benchmark_data[benchmark_data.index <= self.max_date]
-                
-                # Filter untuk periode yang diminta
-                if self.period_years > 0:
-                    end_date = benchmark_data.index.max()
-                    start_date = end_date - pd.DateOffset(years=self.period_years)
-                    benchmark_data = benchmark_data.loc[start_date:end_date]
-                
-                # Simpan data benchmark
-                self.benchmark_data = benchmark_data
-            
-            # Proses data untuk saham
-            for ticker in self.stock_tickers:
-                if ticker in ticker_columns:
-                    cols = ticker_columns[ticker]
-                    
-                    # Extract date and OHLCV data untuk saham
-                    stock_data = df.iloc[data_start_row:, [date_col, cols['open'], cols['high'], cols['low'], cols['close'], cols['volume']]]
-                    stock_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-                    
-                    # Konversi data ke format yang diperlukan
-                    stock_data['Date'] = pd.to_datetime(stock_data['Date'])
-                    stock_data = stock_data.set_index('Date')
-                    stock_data = stock_data.apply(pd.to_numeric, errors='coerce')
-                    
-                    # Filter berdasarkan max_date
-                    stock_data = stock_data[stock_data.index <= self.max_date]
-                    
-                    # Filter untuk periode yang diminta
-                    if self.period_years > 0:
-                        end_date = stock_data.index.max()
-                        start_date = end_date - pd.DateOffset(years=self.period_years)
-                        stock_data = stock_data.loc[start_date:end_date]
-                    
-                    # Simpan data saham
-                    self.stock_data[ticker] = stock_data
-                    
-                    # Tambahkan ke daftar simbol
-                    self.stock_symbols.append(ticker)
-            
-            # Periksa apakah ada data saham yang berhasil dimuat
-            if not self.stock_data:
-                print("Tidak ada data saham yang berhasil dimuat")
-                return False
-            
-            return True
-        
-        except Exception as e:
-            print(f"Error saat memuat data dari file Excel: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return False
     
     def load_data_from_files(self):
         """
@@ -519,12 +384,6 @@ class RRGAnalyzer:
                 # Gunakan ticker dari file CSV jika tersedia
                 display_name = self.ticker_map.get(ticker, ticker)
                 
-                # Jika ticker berakhir dengan " Index" atau " Equity", hapus itu
-                if " Index" in display_name:
-                    display_name = display_name.replace(" Index", "")
-                elif " Equity" in display_name:
-                    display_name = display_name.replace(" Equity", "")
-                
                 # Jika masih terlalu panjang, potong ke 8 karakter
                 if len(display_name) > 8:
                     display_name = display_name[:8]
@@ -540,10 +399,8 @@ class RRGAnalyzer:
         ax.set_ylabel('RS-Momentum')
         
         # Format judul dengan nama benchmark yang lebih bersih
-        if self.benchmark_ticker:
+        if hasattr(self, 'benchmark_ticker') and self.benchmark_ticker:
             benchmark_display = self.benchmark_ticker
-            if " Index" in benchmark_display:
-                benchmark_display = benchmark_display.replace(" Index", "")
         elif self.benchmark_file:
             benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
         else:
@@ -570,10 +427,7 @@ class RRGAnalyzer:
             return None
         
         # Load data
-        if self.excel_file:
-            success = self.load_data_from_bloomberg_excel()
-        else:
-            success = self.load_data_from_files()
+        success = self.load_data_from_files()
         
         if not success:
             print("Gagal memuat data")
