@@ -376,87 +376,82 @@ class RRGAnalyzer:
         return pd.DataFrame(latest_data)
     
     def plot_rrg(self, title=None, trail_length=4):
-        """
-        Plot Relative Rotation Graph
-        :param title: judul grafik
-        :param trail_length: panjang trail (berapa periode sebelumnya yang ditampilkan)
-        """
-        fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Gambar garis sumbu
-        ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
-        ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
-        
-        # Tambahkan latar belakang kuadran
-        ax.fill_between([100, 120], 100, 120, color='green', alpha=0.1)  # Leading
-        ax.fill_between([100, 120], 80, 100, color='yellow', alpha=0.1)  # Weakening
-        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)     # Lagging
-        ax.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)   # Improving
-        
-        # Tambahkan label kuadran
-        ax.text(110, 110, 'LEADING', fontsize=12, ha='center')
-        ax.text(110, 90, 'WEAKENING', fontsize=12, ha='center')
-        ax.text(90, 90, 'LAGGING', fontsize=12, ha='center')
-        ax.text(90, 110, 'IMPROVING', fontsize=12, ha='center')
-        
-        # Plot data untuk setiap saham
-        for ticker in list(self.rs_ratio_norm.keys()):
-            if ticker in self.rs_momentum_norm:
-                # Dapatkan data terbaru dan trail
-                x_series = self.rs_ratio_norm[ticker].dropna()
-                y_series = self.rs_momentum_norm[ticker].dropna()
-                
-                # Pastikan ada cukup data
-                if len(x_series) < 2 or len(y_series) < 2:
-                    continue
-                
-                # Ambil nilai untuk trail (batasi dengan min untuk menghindari error)
-                x_data = x_series.iloc[-min(trail_length, len(x_series)):].values
-                y_data = y_series.iloc[-min(trail_length, len(y_series)):].values
-                
-                # Plot trail jika ada cukup data
-                if len(x_data) >= 2 and len(y_data) >= 2:
-                    ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
-                
-                # Plot titik terbaru (hanya jika ada data)
-                ax.scatter(x_data[-1], y_data[-1], s=50)
-                
-                # Tampilkan label ticker yang lebih bersih
-                # Gunakan ticker dari file CSV jika tersedia
-                display_name = self.ticker_map.get(ticker, ticker)
-                
-                # Jika masih terlalu panjang, potong ke 8 karakter
-                if len(display_name) > 8:
-                    display_name = display_name[:8]
-                
-                # Tampilkan label
-                ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
-        
-        # Set batas dan label
-        ax.set_xlim(80, 130)
-        ax.set_ylim(80, 130)
-        ax.grid(True, alpha=0.3)
-        ax.set_xlabel('RS-Ratio (Relative Strength)')
-        ax.set_ylabel('RS-Momentum')
-        
-        # Format judul dengan nama benchmark yang lebih bersih
-        if hasattr(self, 'benchmark_ticker') and self.benchmark_ticker:
-            benchmark_display = self.benchmark_ticker
-        elif self.benchmark_file:
-            benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
-        else:
-            benchmark_display = "Benchmark"
-        
-        # Tambahkan tanggal analisis ke judul
-        analysis_date = self.get_analysis_date().strftime('%d %b %Y')
-        
-        if title:
-            ax.set_title(f"{title} ({analysis_date})")
-        else:
-            ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_display} ({analysis_date})')
-        
-        plt.tight_layout()
-        return fig
+    """
+    Plot Relative Rotation Graph
+    :param title: judul grafik
+    :param trail_length: panjang trail (berapa periode sebelumnya yang ditampilkan)
+    """
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    # Gambar garis sumbu
+    ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
+    ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
+    
+    # Tambahkan latar belakang kuadran
+    ax.fill_between([100, 130], 100, 130, color='green', alpha=0.1)  # Leading
+    ax.fill_between([100, 130], 80, 100, color='yellow', alpha=0.1)  # Weakening
+    ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)     # Lagging
+    ax.fill_between([80, 100], 100, 130, color='blue', alpha=0.1)   # Improving
+    
+    # Tambahkan label kuadran
+    ax.text(110, 110, 'LEADING', fontsize=12, ha='center')
+    ax.text(110, 90, 'WEAKENING', fontsize=12, ha='center')
+    ax.text(90, 90, 'LAGGING', fontsize=12, ha='center')
+    ax.text(90, 110, 'IMPROVING', fontsize=12, ha='center')
+    
+    # Plot data untuk setiap saham
+    for ticker in list(self.rs_ratio_norm.keys()):
+        if ticker in self.rs_momentum_norm:
+            # Dapatkan data terbaru dan trail
+            x_series = self.rs_ratio_norm[ticker].dropna()
+            y_series = self.rs_momentum_norm[ticker].dropna()
+            
+            # Pastikan ada cukup data
+            if len(x_series) < 2 or len(y_series) < 2:
+                continue
+            
+            # Ambil nilai untuk trail (batasi dengan min untuk menghindari error)
+            x_data = x_series.iloc[-min(trail_length, len(x_series)):].values
+            y_data = y_series.iloc[-min(trail_length, len(y_series)):].values
+            
+            # Plot trail jika ada cukup data
+            if len(x_data) >= 2 and len(y_data) >= 2:
+                ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
+            
+            # Plot titik terbaru
+            ax.scatter(x_data[-1], y_data[-1], s=50)
+            
+            # Tampilkan label ticker
+            display_name = self.ticker_map.get(ticker, ticker)
+            if len(display_name) > 8:
+                display_name = display_name[:8]
+            ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
+    
+    # Set batas dan label
+    ax.set_xlim(80, 130)
+    ax.set_ylim(80, 130)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlabel('RS-Ratio (Relative Strength)')
+    ax.set_ylabel('RS-Momentum')
+    
+    # Format judul dengan nama benchmark
+    if hasattr(self, 'benchmark_ticker') and self.benchmark_ticker:
+        benchmark_display = self.benchmark_ticker
+    elif self.benchmark_file:
+        benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
+    else:
+        benchmark_display = "Benchmark"
+    
+    # Tambahkan tanggal analisis ke judul
+    analysis_date = self.get_analysis_date().strftime('%d %b %Y')
+    
+    if title:
+        ax.set_title(f"{title} ({analysis_date})")
+    else:
+        ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_display} ({analysis_date})')
+    
+    plt.tight_layout()
+    return fig
     
     def analyze(self, rs_ratio_period=63, rs_momentum_period=21):
         """
