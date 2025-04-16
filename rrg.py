@@ -387,18 +387,34 @@ class RRGAnalyzer:
         ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
         ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
         
-        # Tambahkan latar belakang kuadran
-        # Modifikasi rentang kuadran untuk mencakup 80-130 pada kedua sumbu
-        ax.fill_between([100, 130], 100, 130, color='green', alpha=0.1)  # Leading
-        ax.fill_between([100, 130], 80, 100, color='yellow', alpha=0.1)  # Weakening
-        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)     # Lagging
-        ax.fill_between([80, 100], 100, 130, color='blue', alpha=0.1)   # Improving
+        # Definisikan batas grafik yang seimbang
+        x_min, x_max = 70, 130  # Sekarang seimbang (30 unit ke bawah dan 30 unit ke atas)
+        y_min, y_max = 70, 130  # Sekarang seimbang (30 unit ke bawah dan 30 unit ke atas)
         
-        # Tambahkan label kuadran - perbaiki posisi teks agar tepat di tengah kuadran
-        ax.text(115, 115, 'LEADING', fontsize=12, ha='center')     # Tengah kuadran (100-130, 100-130)
-        ax.text(115, 90, 'WEAKENING', fontsize=12, ha='center')    # Tengah kuadran (100-130, 80-100)
-        ax.text(90, 90, 'LAGGING', fontsize=12, ha='center')       # Tengah kuadran (80-100, 80-100)
-        ax.text(90, 115, 'IMPROVING', fontsize=12, ha='center')    # Tengah kuadran (80-100, 100-130)
+        # Tambahkan latar belakang kuadran
+        ax.fill_between([100, x_max], 100, y_max, color='green', alpha=0.1)  # Leading
+        ax.fill_between([100, x_max], y_min, 100, color='yellow', alpha=0.1)  # Weakening
+        ax.fill_between([x_min, 100], y_min, 100, color='red', alpha=0.1)     # Lagging
+        ax.fill_between([x_min, 100], 100, y_max, color='blue', alpha=0.1)   # Improving
+        
+        # Hitung posisi tengah setiap kuadran untuk teks
+        leading_x = 100 + (x_max - 100) / 2
+        leading_y = 100 + (y_max - 100) / 2
+        
+        weakening_x = 100 + (x_max - 100) / 2
+        weakening_y = 100 - (100 - y_min) / 2
+        
+        lagging_x = 100 - (100 - x_min) / 2
+        lagging_y = 100 - (100 - y_min) / 2
+        
+        improving_x = 100 - (100 - x_min) / 2
+        improving_y = 100 + (y_max - 100) / 2
+        
+        # Tambahkan label kuadran dengan posisi yang tepat di tengah
+        ax.text(leading_x, leading_y, 'LEADING', fontsize=12, ha='center', va='center')
+        ax.text(weakening_x, weakening_y, 'WEAKENING', fontsize=12, ha='center', va='center')
+        ax.text(lagging_x, lagging_y, 'LAGGING', fontsize=12, ha='center', va='center')
+        ax.text(improving_x, improving_y, 'IMPROVING', fontsize=12, ha='center', va='center')
         
         # Plot data untuk setiap saham
         for ticker in list(self.rs_ratio_norm.keys()):
@@ -433,9 +449,9 @@ class RRGAnalyzer:
                 # Tampilkan label
                 ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
         
-        # Set batas dan label - ubah rentang sumbu menjadi 80-130
-        ax.set_xlim(80, 130)
-        ax.set_ylim(80, 130)
+        # Set batas dan label
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
         ax.grid(True, alpha=0.3)
         ax.set_xlabel('RS-Ratio (Relative Strength)')
         ax.set_ylabel('RS-Momentum')
