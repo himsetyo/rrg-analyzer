@@ -64,6 +64,8 @@ if use_max_date:
         datetime.now() - timedelta(days=1),
         help="Analisis hanya akan menggunakan data hingga tanggal ini"
     )
+    # Konversi date_input ke string format yang kompatibel
+    max_date = pd.to_datetime(max_date)
 else:
     max_date = None
 
