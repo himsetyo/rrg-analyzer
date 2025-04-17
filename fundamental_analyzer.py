@@ -326,9 +326,15 @@ class FundamentalAnalyzer:
             )
         
         # Tambahkan label ticker
-        for idx, row in combined_data.iterrows():
+        for idx, row in combined_results.iterrows():
+            # Cek apakah Universe_Score tersedia
+            if 'Universe_Score' in row:
+                label_text = f"{row['Symbol']}: U={row['Universe_Score']:.0f}, F={row['Fundamental_Score']:.0f}"
+            else:
+                label_text = row['Symbol']
+                
             ax.annotate(
-                row['Symbol'], 
+                label_text,
                 (row['RS-Ratio'], row['Combined_Score']),
                 xytext=(5, 5),
                 textcoords='offset points',

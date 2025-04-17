@@ -97,16 +97,28 @@ use_fundamental = st.sidebar.checkbox("Aktifkan Analisis Fundamental",
 if use_fundamental:
     st.sidebar.info("Analisis fundamental akan mengambil data dari Yahoo Finance. Proses ini mungkin memerlukan waktu beberapa saat karena adanya pembatasan API.")
     
-    # Bobot untuk analisis gabungan
-    fundamental_weight = st.sidebar.slider(
-        "Bobot Analisis Fundamental:", 
-        0, 100, 50, 
-        help="Persentase bobot untuk analisis fundamental dalam skor gabungan (sisanya untuk RS-Momentum)"
-    )
-    
     refresh_fundamental = st.sidebar.checkbox("Refresh Data Fundamental", value=False, 
                                             help="Aktifkan untuk memaksa refresh data fundamental dari Yahoo Finance")
     
+    if use_fundamental:
+        st.sidebar.info("Analisis fundamental akan mengambil data dari Yahoo Finance. Proses ini mungkin memerlukan waktu beberapa saat karena adanya pembatasan API.")
+
+        # Tambahkan pengaturan untuk Stock Universe Score
+        st.sidebar.subheader("Stock Universe Score")
+        use_universe_score = st.sidebar.checkbox("Aktifkan Stock Universe Score", value=True)
+        
+        if use_universe_score:
+            universe_score_input = st.sidebar.number_input(
+                "Scoring Stock Universe (0-100):", 
+                min_value=0, 
+                max_value=100, 
+                value=50,
+                help="Masukkan skor kesehatan emiten (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa"
+            )
+        
+        refresh_fundamental = st.sidebar.checkbox("Refresh Data Fundamental", value=False, 
+                                               help="Aktifkan untuk memaksa refresh data fundamental dari Yahoo Finance")
+
     # Tambahkan indikator fundamental yang ingin disertakan
     st.sidebar.subheader("Indikator Fundamental")
     include_roe = st.sidebar.checkbox("Return on Equity (ROE)", value=True)
@@ -180,6 +192,30 @@ with st.sidebar.expander("ℹ️ Tentang Analisis Fundamental"):
     - Skor fundamental 0-100 menunjukkan kesehatan keuangan perusahaan
     - Skor gabungan menggabungkan skor fundamental dan RS-Momentum sesuai bobot yang ditentukan
     - Rekomendasi gabungan mempertimbangkan aspek teknikal dan fundamental
+    """)
+
+# Tampilkan penjelasan Analisis Gabungan
+with st.sidebar.expander("ℹ️ Tentang Analisis Gabungan"):
+    st.write("""
+    **Indikator yang Digunakan:**
+    - **Return on Equity (ROE)**: Mengukur kemampuan perusahaan menghasilkan laba dari ekuitas pemegang saham
+    - **Return on Assets (ROA)**: Mengukur seberapa efisien perusahaan menggunakan asetnya untuk menghasilkan laba
+    - **Profit Margins**: Mengukur persentase pendapatan yang menjadi laba bersih
+    - **Earnings Growth**: Pertumbuhan laba perusahaan
+    - **Debt to Equity**: Mengukur berapa banyak hutang vs ekuitas yang digunakan perusahaan
+    
+    **Stock Universe Score**:
+    Penilaian manual (0-100) berdasarkan:
+    - Laba positif 3 tahun terakhir
+    - Total return (dividen + capital gain)
+    - Notasi khusus di bursa
+    
+    **Cara Membaca:**
+    - Skor gabungan menggabungkan:
+      - 40% Stock Universe Score
+      - 30% Skor fundamental
+      - 30% RS-Momentum
+    - Rekomendasi gabungan mempertimbangkan ketiga aspek di atas
     """)
 
 # Fungsi untuk menyimpan file yang di-upload ke file sementara
@@ -329,9 +365,42 @@ if analyze_button:
                 fundamental_results = fundamental_analyzer.get_fundamental_analysis(tickers)
                 
                 my_bar.progress(90, text="Menggabungkan hasil analisis...")
-                # Set bobot untuk analisis gabungan (fundamental vs teknikal)
-                fundamental_analyzer.technical_weight = 1 - (fundamental_weight / 100)
-                fundamental_analyzer.fundamental_weight = fundamental_weight / 100
+                
+                # Untuk menggunakan bobot tetap dan skor universe
+                if use_fundamental:
+                    # Tetapkan bobot tetap: 30% fundamental, 30% technical, 40% universe
+                    fundamental_analyzer.technical_weight = 0.3
+                    fundamental_analyzer.fundamental_weight = 0.3
+                    
+                    # Gabungkan hasil RRG dan fundamental
+                    combined_results = fundamental_analyzer.combine_with_rrg(fundamental_results, rrg_results)
+                    
+                    # Tambahkan Stock Universe Score jika diaktifkan
+                    if use_universe_score:
+                        # Tambahkan kolom universe score
+                        combined_results['Universe_Score'] = universe_score_input
+                        
+                        # Hitung skor gabungan baru dengan 3 komponen
+                        combined_results['Combined_Score'] = (
+                            combined_results['Universe_Score'] * 0.4 +
+                            combined_results['Fundamental_Score'] * 0.3 +
+                            combined_results['RS_Momentum_Normalized'] * 0.3
+                        )
+                        
+                        # Update rekomendasi berdasarkan skor gabungan baru
+                        def get_combined_recommendation(score):
+                            if score >= 80:
+                                return "Strong Buy"
+                            elif score >= 65:
+                                return "Buy"
+                            elif score >= 50:
+                                return "Hold"
+                            elif score >= 35:
+                                return "Reduce"
+                            else:
+                                return "Sell"
+                        
+                        combined_results['Combined_Recommendation'] = combined_results['Combined_Score'].apply(get_combined_recommendation)
                 
                 combined_results = fundamental_analyzer.combine_with_rrg(fundamental_results, rrg_results)
             
@@ -465,8 +534,14 @@ if analyze_button:
                         # Gabungan
                         st.subheader("Hasil Analisis Gabungan")
                         # Pilih kolom yang ingin ditampilkan
-                        columns_to_show = ['Symbol', 'RS-Ratio', 'RS-Momentum', 'Quadrant', 
-                                         'Fundamental_Score', 'Combined_Score', 'Combined_Recommendation']
+                        columns_to_show = ['Symbol', 'RS-Ratio', 'RS-Momentum', 'Quadrant']
+
+                        # Jika menggunakan Universe Score
+                        if use_universe_score:
+                            columns_to_show.append('Universe_Score')
+
+                        # Tambahkan kolom fundamental dan kombinasi
+                        columns_to_show.extend(['Fundamental_Score', 'Combined_Score', 'Combined_Recommendation'])
                         
                         if 'longName' in combined_results.columns:
                             columns_to_show.insert(1, 'longName')
@@ -748,9 +823,13 @@ if analyze_button:
                     
                     ### Skor Gabungan
                     
-                    Skor gabungan dihitung dengan menggabungkan:
-                    - Skor fundamental (0-100) berdasarkan indikator fundamental
-                    - RS-Momentum yang dinormalisasi (0-100)
+                    **Catatan Analisis Gabungan:**
+                    - Data fundamental diambil dari Yahoo Finance dan mungkin tidak selalu tersedia atau terbaru
+                    - Stock Universe Score adalah input manual (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa
+                    - Skor gabungan dihitung dengan bobot:
+                      - 40% Stock Universe Score
+                      - 30% Skor Fundamental
+                      - 30% Skor RS-Momentum (Technical)
                     
                     Rekomendasi didasarkan pada skor gabungan:
                     - **Strong Buy** (80-100): Fundamental kuat dan momentum teknikal positif
@@ -761,4 +840,4 @@ if analyze_button:
                     """)
 # Footer
 st.markdown("---")
-st.markdown("Dibuat dengan ❤️ menggunakan Python dan Streamlit | © 2025")
+st.markdown("Dibuat dengan ❤️ oleh Himawan Susetyo menggunakan Python dan Streamlit | © 2025")
