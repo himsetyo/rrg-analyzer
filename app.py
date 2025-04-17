@@ -6,6 +6,7 @@ import time
 import os
 import tempfile
 import numpy as np
+from report import create_and_download_report
 
 # Konfigurasi halaman harus menjadi perintah Streamlit pertama
 st.set_page_config(
@@ -770,6 +771,19 @@ if analyze_button:
                     - Anda dapat melakukan refresh data fundamental dengan mencentang opsi "Refresh Data Fundamental" di sidebar
                     - Skor fundamental dihitung berdasarkan indikator yang Anda pilih dengan bobot yang telah ditentukan
                     """)
+
+                # tombol untuk generate report
+                st.markdown("---")
+                st.subheader("📄 Generate Report")
+
+                if st.button("📊 Generate PDF Report", type="primary"):
+                    # Panggil fungsi untuk membuat laporan PDF
+                    create_and_download_report(
+                        combined_results if combined_results is not None else rrg_results, 
+                        analysis_type,
+                        use_fundamental,
+                        use_universe_score if 'use_universe_score' in locals() else False
+                    )
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
