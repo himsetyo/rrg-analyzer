@@ -590,13 +590,20 @@ if analyze_button:
                         'debtToEquity': '{:.2f}'
                     }
                     
+                    # Buat salinan data untuk menghindari warning
+                    results_to_show_copy = results_to_show.copy()
+
                     # Format tabel untuk ditampilkan
-                    styled_table = results_to_show.style
-                    
+                    styled_table = results_to_show_copy.style
+
                     # Terapkan format numerik pada kolom yang ada
                     for col, fmt in format_dict.items():
-                        if col in results_to_show.columns:
-                            styled_table = styled_table.format({col: fmt})
+                        if col in results_to_show_copy.columns:
+                            if any(pd.isna(results_to_show_copy[col])):
+                                # Jika ada nilai NaN di kolom, gunakan na_rep='N/A'
+                                styled_table = styled_table.format({col: fmt}, na_rep='N/A')
+                            else:
+                                styled_table = styled_table.format({col: fmt})
                     
                     # Terapkan highlight pada kolom yang ada
                     if 'Quadrant' in results_to_show.columns:
