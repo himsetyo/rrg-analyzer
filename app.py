@@ -760,9 +760,91 @@ def display_report_button():
     st.markdown("---")
     st.subheader("📄 Generate Report")
     
-    if st.button("📊 Generate PDF Report", type="primary", key="generate_report"):
+    report_col1, report_col2 = st.columns([1, 1])
+    
+    with report_col1:
+        html_report = st.button("🌐 Open HTML Report", type="primary", key="html_report")
+    
+    with report_col2:
+        pdf_report = st.button("📄 Download PDF Report", key="pdf_report")
+    
+    if html_report:
         # Tampilkan indikator proses
-        report_progress = st.progress(0, text="Mempersiapkan laporan...")
+        report_progress = st.progress(0, text="Mempersiapkan laporan HTML...")
+        
+        # Buat placeholder untuk pesan status
+        status_placeholder = st.empty()
+        status_placeholder.info("Membuat laporan HTML, mohon tunggu...")
+        
+        try:
+            # Update progress
+            report_progress.progress(30, text="Mengumpulkan data analisis...")
+            time.sleep(0.5)
+            
+            report_progress.progress(60, text="Membuat visualisasi...")
+            time.sleep(0.5)
+            
+            report_progress.progress(90, text="Menyusun laporan...")
+            
+            # Import modul report_html
+            from report_html import create_html_report
+            
+            # Buat laporan HTML
+            html_content, filename = create_html_report(
+                st.session_state.combined_results if st.session_state.combined_results is not None else st.session_state.rrg_results,
+                st.session_state.analysis_type,
+                st.session_state.use_fundamental,
+                st.session_state.use_universe_score
+            )
+            
+            # Update progress ke 100% menandakan selesai
+            report_progress.progress(100, text="Laporan selesai!")
+            time.sleep(0.5)
+            
+            # Hapus progress bar
+            report_progress.empty()
+            
+            # Gunakan HTML display untuk menampilkan laporan
+            # Simpan HTML ke file sementara dan buka di tab baru
+            import tempfile
+            import webbrowser
+            import os
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w') as f:
+                f.write(html_content)
+                temp_html_path = f.name
+            
+            # Buka file HTML di browser default
+            #webbrowser.open('file://' + os.path.realpath(temp_html_path), new=2)
+            with open(temp_html_path, "r") as f:
+                html_content = f.read()
+
+            # Tampilkan tombol download HTML
+            st.download_button(
+                label="📥 Download HTML Report",
+                data=html_content,
+                file_name=filename,
+                mime="text/html",
+                key="download_html_report"
+            )
+
+            # Opsional: Tambahkan instruksi
+            st.info("Setelah mengunduh file HTML, buka di browser Anda lalu gunakan fitur 'Print' atau 'Save as PDF' di browser.")
+            
+            # Update pesan status
+            status_placeholder.success("✅ Laporan HTML berhasil dibuat dan dibuka di tab browser baru!")
+            
+        except Exception as e:
+            # Jika terjadi error, tampilkan pesan error
+            report_progress.empty()
+            status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
+            st.error(f"Detail error: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    if pdf_report:
+        # Tampilkan indikator proses
+        report_progress = st.progress(0, text="Mempersiapkan laporan PDF...")
         
         # Buat placeholder untuk pesan status
         status_placeholder = st.empty()
@@ -770,15 +852,15 @@ def display_report_button():
         
         try:
             # Update progress
-            report_progress.progress(25, text="Mengumpulkan data analisis...")
+            report_progress.progress(30, text="Mengumpulkan data analisis...")
             time.sleep(0.5)
             
-            report_progress.progress(50, text="Membuat visualisasi...")
+            report_progress.progress(60, text="Membuat visualisasi...")
             time.sleep(0.5)
             
-            report_progress.progress(75, text="Menyusun laporan...")
+            report_progress.progress(90, text="Menyusun laporan...")
             
-            # Gunakan data dari session state untuk membuat laporan
+            # Gunakan create_and_download_report dari report.py untuk PDF
             create_and_download_report(
                 st.session_state.combined_results if st.session_state.combined_results is not None else st.session_state.rrg_results,
                 st.session_state.analysis_type,
