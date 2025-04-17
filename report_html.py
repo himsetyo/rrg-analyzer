@@ -2,6 +2,8 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.patches import Wedge
+import matplotlib.patches as mpatches
 import io
 import base64
 import numpy as np
@@ -305,7 +307,7 @@ def create_gauge_charts_base64(data, use_fundamental, use_universe_score):
         
         # Draw gauge
         ax.add_patch(plt.Circle((0.5, 0), 0.4, fill=False, color='gray'))
-        ax.add_patch(plt.Wedge((0.5, 0), 0.4, 0, angle*180/np.pi, color=color, alpha=0.8))
+        ax.add_patch(Wedge((0.5, 0), 0.4, 0, angle*180/np.pi, color=color, alpha=0.8))
         
         # Add value text
         ax.text(0.5, 0, f"{value:.1f}", ha='center', va='center', fontsize=15, fontweight='bold')
