@@ -134,9 +134,6 @@ if use_fundamental:
                 value=100,
                 help="Masukkan skor kesehatan emiten (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa"
             )
-        
-        refresh_fundamental = st.sidebar.checkbox("Refresh Data Fundamental", value=False, 
-                                               help="Aktifkan untuk memaksa refresh data fundamental dari Yahoo Finance")
 
     # Tambahkan indikator fundamental yang ingin disertakan
     st.sidebar.subheader("Indikator Fundamental")
