@@ -23,6 +23,16 @@ def create_and_download_report(data, analysis_type, use_fundamental=False, use_u
     :param use_fundamental: Boolean apakah analisis fundamental aktif
     :param use_universe_score: Boolean apakah Stock Universe Score digunakan
     """
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    import matplotlib.pyplot as plt
+    import io
+    import base64
+    from datetime import datetime
+    
     # Tentukan apakah ini laporan untuk satu saham atau perbandingan
     num_stocks = len(data['Symbol'].unique())
     is_comparison = num_stocks > 1
@@ -48,31 +58,44 @@ def create_and_download_report(data, analysis_type, use_fundamental=False, use_u
     
     # Siapkan style
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(
-        name='Title',
-        parent=styles['Heading1'],
+    
+    # Tambahkan style baru hanya jika belum ada
+    def add_style_if_not_exists(name, parent_style, **kwargs):
+        if name not in styles:
+            styles.add(ParagraphStyle(
+                name=name,
+                parent=styles[parent_style],
+                **kwargs
+            ))
+    
+    # Tambahkan style yang diperlukan
+    add_style_if_not_exists(
+        'CustomTitle',
+        'Heading1',
         fontSize=18,
         alignment=1,  # Center
         spaceAfter=12
-    ))
-    styles.add(ParagraphStyle(
-        name='Subtitle',
-        parent=styles['Heading2'],
+    )
+    
+    add_style_if_not_exists(
+        'Subtitle',
+        'Heading2',
         fontSize=14,
         alignment=1,  # Center
         spaceAfter=8
-    ))
-    styles.add(ParagraphStyle(
-        name='Normal_Center',
-        parent=styles['Normal'],
+    )
+    
+    add_style_if_not_exists(
+        'Normal_Center',
+        'Normal',
         alignment=1  # Center
-    ))
+    )
     
     # Konten laporan
     content = []
     
     # Judul dan tanggal
-    content.append(Paragraph(report_title, styles['Title']))
+    content.append(Paragraph(report_title, styles['CustomTitle']))
     content.append(Paragraph(f"Tanggal: {datetime.now().strftime('%d %B %Y')}", styles['Normal_Center']))
     content.append(Spacer(1, 12))
     
