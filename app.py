@@ -72,9 +72,14 @@ def create_sidebar():
         help="Pilih jenis analisis yang ingin dilakukan"
     )
     
+    # Inisialisasi variabel-variabel dengan nilai default
+    # PERBAIKAN: Inisialisasi use_universe_score dan universe_score_input di awal
+    use_universe_score = False
+    universe_score_input = 100
+    
     # Maksimal tanggal analisis
     use_max_date = st.sidebar.checkbox(
-        "Batasi Tanggal Analisis", 
+        "Batasi Tanggal Analisis",
         value=False,
         help="Aktifkan untuk membatasi analisis hingga tanggal tertentu"
     )
@@ -94,13 +99,12 @@ def create_sidebar():
     col1, col2 = st.sidebar.columns(2)
     with col1:
         period_years = st.number_input(
-            "Periode Data (tahun):", 
-            0.5, 10.0, 3.0, 
-            step=0.5
+            "Periode Data (tahun):",
+            0.5, 10.0, 3.0, step=0.5
         )
     with col2:
         trail_length = st.number_input(
-            "Panjang Trail:", 
+            "Panjang Trail:",
             1, 20, 12,
             help="Jumlah periode terakhir yang ditampilkan pada grafik"
         )
@@ -109,23 +113,28 @@ def create_sidebar():
     col3, col4 = st.sidebar.columns(2)
     with col3:
         rs_ratio_period = st.number_input(
-            "Periode RS-Ratio:", 
+            "Periode RS-Ratio:",
             5, 100, 52,
             help="Periode untuk perhitungan RS-Ratio (hari trading)"
         )
     with col4:
         rs_momentum_period = st.number_input(
-            "Periode RS-Momentum:", 
+            "Periode RS-Momentum:",
             3, 60, 26,
             help="Periode untuk perhitungan RS-Momentum (hari trading)"
         )
     
     # Opsi untuk analisis fundamental
-    use_fundamental = st.sidebar.checkbox(
-        "Aktifkan Analisis Fundamental",
-        value=True if analysis_type in ["Fundamental", "Gabungan (Teknikal + Fundamental)"] else False
-    )
+    use_fundamental = False
+    if analysis_type in ["Fundamental", "Gabungan (Teknikal + Fundamental)"]:
+        use_fundamental = st.sidebar.checkbox(
+            "Aktifkan Analisis Fundamental", 
+            value=True
+        )
+    else:
+        use_fundamental = False
     
+    # Inisialisasi parameter fundamental
     fundamental_params = {}
     
     if use_fundamental:
@@ -133,22 +142,21 @@ def create_sidebar():
         
         # Stock Universe Score
         st.sidebar.subheader("Stock Universe Score")
-        use_universe_score = st.sidebar.checkbox("Aktifkan Stock Universe Score", value=True)
-        
-        universe_score_input = 50
-        if use_universe_score:
-            universe_score_input = st.sidebar.number_input(
-                "Scoring Stock Universe (0-100):", 
-                min_value=0, 
-                max_value=100, 
-                value=50,
-                help="Masukkan skor kesehatan emiten (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa"
-            )
+        if analysis_type == "Gabungan (Teknikal + Fundamental)":
+            use_universe_score = st.sidebar.checkbox("Aktifkan Stock Universe Score", value=True)
+            if use_universe_score:
+                universe_score_input = st.sidebar.number_input(
+                    "Scoring Stock Universe (0-100):",
+                    min_value=0,
+                    max_value=100,
+                    value=50,
+                    help="Masukkan skor kesehatan emiten (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa"
+                )
         
         # Refresh data fundamental
         refresh_fundamental = st.sidebar.checkbox(
-            "Refresh Data Fundamental", 
-            value=False, 
+            "Refresh Data Fundamental",
+            value=False,
             key="refresh_fundamental_key",
             help="Aktifkan untuk memaksa refresh data fundamental dari Yahoo Finance"
         )
@@ -171,10 +179,10 @@ def create_sidebar():
         
         # Normalisasi bobot agar totalnya 100%
         total_weight = (roe_weight if include_roe else 0) + \
-                      (roa_weight if include_roa else 0) + \
-                      (pm_weight if include_profit_margin else 0) + \
-                      (eg_weight if include_earnings_growth else 0) + \
-                      (de_weight if include_debt_equity else 0)
+                       (roa_weight if include_roa else 0) + \
+                       (pm_weight if include_profit_margin else 0) + \
+                       (eg_weight if include_earnings_growth else 0) + \
+                       (de_weight if include_debt_equity else 0)
         
         if total_weight > 0:
             roe_weight = roe_weight / total_weight if include_roe else 0
