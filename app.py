@@ -777,13 +777,49 @@ if analyze_button:
                 st.subheader("📄 Generate Report")
 
                 if st.button("📊 Generate PDF Report", type="primary"):
-                    # Panggil fungsi untuk membuat laporan PDF
-                    create_and_download_report(
-                        combined_results if combined_results is not None else rrg_results, 
-                        analysis_type,
-                        use_fundamental,
-                        use_universe_score if 'use_universe_score' in locals() else False
-                    )
+                    # Tampilkan indikator proses
+                    report_progress = st.progress(0, text="Mempersiapkan laporan...")
+                    
+                    # Buat placeholder untuk pesan status
+                    status_placeholder = st.empty()
+                    status_placeholder.info("Membuat laporan PDF, mohon tunggu...")
+                    
+                    try:
+                        # Update progress
+                        report_progress.progress(25, text="Mengumpulkan data analisis...")
+                        time.sleep(0.5)  # Berikan waktu sedikit untuk animasi progress
+                        
+                        report_progress.progress(50, text="Membuat visualisasi...")
+                        time.sleep(0.5)
+                        
+                        report_progress.progress(75, text="Menyusun laporan...")
+                        
+                        # Panggil fungsi untuk membuat laporan PDF
+                        create_and_download_report(
+                            combined_results if combined_results is not None else rrg_results, 
+                            analysis_type,
+                            use_fundamental,
+                            use_universe_score if 'use_universe_score' in locals() else False
+                        )
+                        
+                        # Update progress ke 100% menandakan selesai
+                        report_progress.progress(100, text="Laporan selesai!")
+                        time.sleep(0.5)  # Berikan waktu sedikit untuk animasi progress
+                        
+                        # Hapus progress bar setelah selesai
+                        report_progress.empty()
+                        
+                        # Update pesan status
+                        status_placeholder.success("✅ Laporan PDF berhasil dibuat! Klik tombol download di bawah untuk mengunduh.")
+                    
+                    except Exception as e:
+                        # Jika terjadi error, tampilkan pesan error
+                        report_progress.empty()  # Hapus progress bar
+                        status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
+                        if debug_mode:
+                            st.error(f"Detail error: {str(e)}")
+                            import traceback
+                            st.code(traceback.format_exc())
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
