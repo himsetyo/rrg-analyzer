@@ -249,12 +249,35 @@ if analyze_button or st.session_state.has_analyzed:
     use_universe_score_to_use = use_universe_score if analyze_button else st.session_state.use_universe_score
     analysis_date_to_use = rrg_analyzer.get_analysis_date().strftime('%d %B %Y') if analyze_button else st.session_state.analysis_date
 
+    # Tentukan variabel yang akan digunakan
+    if analyze_button:
+        # Jika tombol analisis ditekan, gunakan hasil terbaru
+        results_to_use = rrg_results
+        combined_to_use = combined_results
+        analysis_type_to_use = analysis_type
+        use_fundamental_to_use = use_fundamental
+        use_universe_score_to_use = use_universe_score
+        # Simpan tanggal analisis ke session state
+        if 'rrg_analyzer' in locals() and hasattr(rrg_analyzer, 'get_analysis_date'):
+            st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
+        else:
+            st.session_state.analysis_date = datetime.now().strftime('%d %B %Y')
+        analysis_date_to_use = st.session_state.analysis_date
+    else:
+        # Jika tidak, gunakan data dari session state
+        results_to_use = st.session_state.rrg_results
+        combined_to_use = st.session_state.combined_results
+        analysis_type_to_use = st.session_state.analysis_type
+        use_fundamental_to_use = st.session_state.use_fundamental
+        use_universe_score_to_use = st.session_state.use_universe_score
+        analysis_date_to_use = st.session_state.analysis_date
+
     if (results_to_use is None or len(results_to_use) == 0) and combined_to_use is None:
         st.error("Tidak dapat melakukan analisis. Pastikan data tersedia dan parameter sudah benar.")
     else:
         # Tampilkan tanggal analisis aktual
         st.subheader(f"Analisis pada tanggal: {analysis_date_to_use}")
-        
+
     if benchmark_file is None:
         st.error("Silakan upload file benchmark terlebih dahulu.")
     elif not stock_files:
@@ -436,21 +459,23 @@ if analyze_button or st.session_state.has_analyzed:
             my_bar.progress(100, text="Analisis selesai!")
             time.sleep(0.5)  # Beri waktu user untuk melihat progress 100%
             my_bar.empty()
+            
+            # Clean up temp files
+            os.unlink(benchmark_temp)
+            for temp_file in stock_temps:
+                os.unlink(temp_file)
 
-            # Menyimpan Hasil analisis ke Session State
+            # Simpan hasil ke session state
             st.session_state.has_analyzed = True
             st.session_state.rrg_results = rrg_results
             st.session_state.combined_results = combined_results
             st.session_state.analysis_type = analysis_type
             st.session_state.use_fundamental = use_fundamental
             st.session_state.use_universe_score = use_universe_score
-            st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
-
-            
-            # Clean up temp files
-            os.unlink(benchmark_temp)
-            for temp_file in stock_temps:
-                os.unlink(temp_file)
+            if 'rrg_analyzer' in locals() and hasattr(rrg_analyzer, 'get_analysis_date'):
+                st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
+            else:
+                st.session_state.analysis_date = datetime.now().strftime('%d %B %Y')
             
             # Tampilkan hasil
             if (rrg_results is None or len(rrg_results) == 0) and combined_results is None:
@@ -855,7 +880,7 @@ if analyze_button or st.session_state.has_analyzed:
                         # Jika terjadi error, tampilkan pesan error
                         report_progress.empty()
                         status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
-                        if debug_mode:
+                        if 'debug_mode' in locals() and debug_mode:
                             st.error(f"Detail error: {str(e)}")
                             import traceback
                             st.code(traceback.format_exc())
