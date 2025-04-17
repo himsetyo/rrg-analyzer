@@ -8,6 +8,24 @@ import tempfile
 import numpy as np
 from report import create_and_download_report
 
+# Inisialisasi session state untuk menyimpan hasil analisis
+if 'has_analyzed' not in st.session_state:
+    st.session_state.has_analyzed = False
+if 'analysis_results' not in st.session_state:
+    st.session_state.analysis_results = None
+if 'combined_results' not in st.session_state:
+    st.session_state.combined_results = None
+if 'rrg_results' not in st.session_state:
+    st.session_state.rrg_results = None
+if 'analysis_type' not in st.session_state:
+    st.session_state.analysis_type = None
+if 'use_fundamental' not in st.session_state:
+    st.session_state.use_fundamental = False
+if 'use_universe_score' not in st.session_state:
+    st.session_state.use_universe_score = False
+if 'analysis_date' not in st.session_state:
+    st.session_state.analysis_date = None
+
 # Konfigurasi halaman harus menjadi perintah Streamlit pertama
 st.set_page_config(
     page_title="Comprehensive Stock Analyzer",
@@ -225,7 +243,21 @@ def save_uploaded_file(uploaded_file):
         f.write(uploaded_file.getvalue())
     return f.name
 
-if analyze_button:
+if analyze_button or st.session_state.has_analyzed:
+    # Tentukan variabel yang akan digunakan berdasarkan session state jika tersedia
+    results_to_use = st.session_state.rrg_results if analyze_button else st.session_state.rrg_results
+    combined_to_use = st.session_state.combined_results if analyze_button else st.session_state.combined_results
+    analysis_type_to_use = analysis_type if analyze_button else st.session_state.analysis_type
+    use_fundamental_to_use = use_fundamental if analyze_button else st.session_state.use_fundamental
+    use_universe_score_to_use = use_universe_score if analyze_button else st.session_state.use_universe_score
+    analysis_date_to_use = rrg_analyzer.get_analysis_date().strftime('%d %B %Y') if analyze_button else st.session_state.analysis_date
+
+    if (results_to_use is None or len(results_to_use) == 0) and combined_to_use is None:
+        st.error("Tidak dapat melakukan analisis. Pastikan data tersedia dan parameter sudah benar.")
+    else:
+        # Tampilkan tanggal analisis aktual
+        st.subheader(f"Analisis pada tanggal: {analysis_date_to_use}")
+        
     if benchmark_file is None:
         st.error("Silakan upload file benchmark terlebih dahulu.")
     elif not stock_files:
@@ -407,6 +439,16 @@ if analyze_button:
             my_bar.progress(100, text="Analisis selesai!")
             time.sleep(0.5)  # Beri waktu user untuk melihat progress 100%
             my_bar.empty()
+
+            # Menyimpan Hasil analisis ke Session State
+            st.session_state.has_analyzed = True
+            st.session_state.rrg_results = rrg_results
+            st.session_state.combined_results = combined_results
+            st.session_state.analysis_type = analysis_type
+            st.session_state.use_fundamental = use_fundamental
+            st.session_state.use_universe_score = use_universe_score
+            st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
+
             
             # Clean up temp files
             os.unlink(benchmark_temp)
@@ -776,7 +818,7 @@ if analyze_button:
                 st.markdown("---")
                 st.subheader("📄 Generate Report")
 
-                if st.button("📊 Generate PDF Report", type="primary"):
+                if st.button("📊 Generate PDF Report", type="primary", key="generate_report_btn"):
                     # Tampilkan indikator proses
                     report_progress = st.progress(0, text="Mempersiapkan laporan...")
                     
@@ -787,7 +829,7 @@ if analyze_button:
                     try:
                         # Update progress
                         report_progress.progress(25, text="Mengumpulkan data analisis...")
-                        time.sleep(0.5)  # Berikan waktu sedikit untuk animasi progress
+                        time.sleep(0.5)
                         
                         report_progress.progress(50, text="Membuat visualisasi...")
                         time.sleep(0.5)
@@ -796,15 +838,15 @@ if analyze_button:
                         
                         # Panggil fungsi untuk membuat laporan PDF
                         create_and_download_report(
-                            combined_results if combined_results is not None else rrg_results, 
-                            analysis_type,
-                            use_fundamental,
-                            use_universe_score if 'use_universe_score' in locals() else False
+                            st.session_state.combined_results if st.session_state.combined_results is not None else st.session_state.rrg_results,
+                            st.session_state.analysis_type,
+                            st.session_state.use_fundamental,
+                            st.session_state.use_universe_score
                         )
                         
                         # Update progress ke 100% menandakan selesai
                         report_progress.progress(100, text="Laporan selesai!")
-                        time.sleep(0.5)  # Berikan waktu sedikit untuk animasi progress
+                        time.sleep(0.5)
                         
                         # Hapus progress bar setelah selesai
                         report_progress.empty()
@@ -814,7 +856,7 @@ if analyze_button:
                     
                     except Exception as e:
                         # Jika terjadi error, tampilkan pesan error
-                        report_progress.empty()  # Hapus progress bar
+                        report_progress.empty()
                         status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
                         if debug_mode:
                             st.error(f"Detail error: {str(e)}")
