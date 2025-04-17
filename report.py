@@ -1,3 +1,19 @@
+# report.py
+# File untuk menangani pembuatan laporan PDF
+
+import io
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+import streamlit as st
+
 def create_and_download_report(data, analysis_type, use_fundamental=False, use_universe_score=False):
     """
     Membuat laporan PDF berdasarkan hasil analisis
