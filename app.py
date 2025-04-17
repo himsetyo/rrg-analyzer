@@ -386,7 +386,7 @@ def display_results():
             # Tampilkan grafik RRG saja
             st.subheader("Relative Rotation Graph (RRG)")
             
-            # Buat instance RRG Analyzer
+            # Buat instance kosong untuk plotting
             rrg_analyzer = RRGAnalyzer()
             
             # PERBAIKAN: Setel data ke format yang benar
@@ -396,6 +396,7 @@ def display_results():
             # Inisialisasi dictionary untuk rs_ratio_norm dan rs_momentum_norm
             rrg_analyzer.rs_ratio_norm = {}
             rrg_analyzer.rs_momentum_norm = {}
+            rrg_analyzer.ticker_map = {}
             
             # Untuk setiap ticker, isi data dari hasil analisis
             for ticker in tickers:
@@ -405,9 +406,11 @@ def display_results():
                     rrg_analyzer.rs_ratio_norm[ticker] = pd.Series([ticker_data['RS-Ratio'].values[0]])
                     # Buat Series dengan nilai RS-Momentum  
                     rrg_analyzer.rs_momentum_norm[ticker] = pd.Series([ticker_data['RS-Momentum'].values[0]])
+                    # Simpan juga ticker asli untuk ditampilkan
+                    rrg_analyzer.ticker_map[ticker] = ticker
             
-            # Plot dengan marker yang lebih jelas
-            fig = rrg_analyzer.plot_rrg(trail_length=12)
+            # Plot dengan parameter yang sesuai
+            fig = rrg_analyzer.plot_rrg(trail_length=trail_length)
             st.pyplot(fig)
             
         elif analysis_type == "Fundamental" and use_fundamental:
