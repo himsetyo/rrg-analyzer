@@ -397,6 +397,12 @@ class RRGAnalyzer:
         ax.fill_between([x_min, 100], y_min, 100, color='red', alpha=0.1)     # Lagging
         ax.fill_between([x_min, 100], 100, y_max, color='blue', alpha=0.1)   # Improving
         
+        # Label kuadran
+        ax.text(115, 115, 'LEADING', fontsize=12, ha='center', va='center')
+        ax.text(115, 85, 'WEAKENING', fontsize=12, ha='center', va='center')
+        ax.text(85, 85, 'LAGGING', fontsize=12, ha='center', va='center')
+        ax.text(85, 115, 'IMPROVING', fontsize=12, ha='center', va='center')
+
         # Hitung posisi tengah setiap kuadran untuk teks
         leading_x = 100 + (x_max - 100) / 2
         leading_y = 100 + (y_max - 100) / 2
@@ -422,18 +428,34 @@ class RRGAnalyzer:
                 # Dapatkan data terbaru dan trail
                 x_series = self.rs_ratio_norm[ticker].dropna()
                 y_series = self.rs_momentum_norm[ticker].dropna()
-                
+
                 # Pastikan ada cukup data
-                if len(x_series) < 2 or len(y_series) < 2:
+                if len(x_series) == 0 or len(y_series) == 0:
                     continue
+
+                # Ambil nilai terbaru
+                x_latest = x_series.iloc[-1]
+                y_latest = y_series.iloc[-1]
+
+                # PERBAIKAN: Plot dengan marker yang lebih jelas dan ukuran lebih besar
+                ax.scatter(x_latest, y_latest, s=100, marker='o', color='blue', 
+                          edgecolors='black', linewidths=1.5, zorder=10)
+
+                # Tampilkan label ticker
+                display_name = self.ticker_map.get(ticker, ticker) if hasattr(self, 'ticker_map') else ticker
                 
-                # Ambil nilai untuk trail (batasi dengan min untuk menghindari error)
-                x_data = x_series.iloc[-min(trail_length, len(x_series)):].values
-                y_data = y_series.iloc[-min(trail_length, len(y_series)):].values
-                
-                # Plot trail jika ada cukup data
-                if len(x_data) >= 2 and len(y_data) >= 2:
-                    ax.plot(x_data, y_data, '-', linewidth=1, alpha=0.6)
+                # PERBAIKAN: Tambahkan box untuk label
+                ax.annotate(display_name, (x_latest, y_latest), 
+                            xytext=(7, 7), textcoords='offset points',
+                            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+                            fontsize=9, fontweight='bold')
+
+                # Plot trail jika ada cukup data untuk trail
+                if len(x_series) >= 2 and trail_length > 1:
+                    x_trail = x_series.iloc[-min(trail_length, len(x_series)):].values
+                    y_trail = y_series.iloc[-min(trail_length, len(y_series)):].values
+                    if len(x_trail) >= 2:
+                        ax.plot(x_trail, y_trail, '-', linewidth=1, alpha=0.6)
                 
                 # Plot titik terbaru (hanya jika ada data)
                 ax.scatter(x_data[-1], y_data[-1], s=50)
@@ -457,21 +479,16 @@ class RRGAnalyzer:
         ax.set_ylabel('RS-Momentum')
         
         # Format judul dengan nama benchmark yang lebih bersih
-        if hasattr(self, 'benchmark_ticker') and self.benchmark_ticker:
-            benchmark_display = self.benchmark_ticker
-        elif self.benchmark_file:
-            benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
-        else:
-            benchmark_display = "Benchmark"
-        
-        # Tambahkan tanggal analisis ke judul
-        analysis_date = self.get_analysis_date().strftime('%d %b %Y')
-        
+        analysis_date = datetime.now().strftime('%d %b %Y')
+        if hasattr(self, 'get_analysis_date'):
+            analysis_date = self.get_analysis_date().strftime('%d %b %Y')
+            
         if title:
             ax.set_title(f"{title} ({analysis_date})")
         else:
+            benchmark_display = getattr(self, 'benchmark_ticker', 'Benchmark')
             ax.set_title(f'Relative Rotation Graph (RRG) vs {benchmark_display} ({analysis_date})')
-        
+
         plt.tight_layout()
         return fig
     
