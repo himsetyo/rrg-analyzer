@@ -95,9 +95,9 @@ use_fundamental = st.sidebar.checkbox("Aktifkan Analisis Fundamental",
                                     value=True if analysis_type in ["Fundamental", "Gabungan (Teknikal + Fundamental)"] else False)
 
 if use_fundamental:
-    st.sidebar.info("Analisis fundamental akan mengambil data dari Yahoo Finance. Proses ini mungkin memerlukan waktu beberapa saat karena adanya pembatasan API.")
+    # st.sidebar.info("Analisis fundamental akan mengambil data dari Yahoo Finance. Proses ini mungkin memerlukan waktu beberapa saat karena adanya pembatasan API.")
     
-    refresh_fundamental = st.sidebar.checkbox("Refresh Data Fundamental", value=False, 
+    refresh_fundamental = st.sidebar.checkbox("Refresh Data Fundamental", value=False, key="refresh_fundamental_key", 
                                             help="Aktifkan untuk memaksa refresh data fundamental dari Yahoo Finance")
     
     if use_fundamental:
@@ -401,9 +401,7 @@ if analyze_button:
                                 return "Sell"
                         
                         combined_results['Combined_Recommendation'] = combined_results['Combined_Score'].apply(get_combined_recommendation)
-                
-                combined_results = fundamental_analyzer.combine_with_rrg(fundamental_results, rrg_results)
-            
+                                         
             # Step 7: Selesai
             my_bar.progress(100, text="Analisis selesai!")
             time.sleep(0.5)  # Beri waktu user untuk melihat progress 100%
@@ -476,8 +474,14 @@ if analyze_button:
                         
                         # Tambahkan label ticker
                         for idx, row in combined_results.iterrows():
+                            # Cek apakah Universe_Score tersedia
+                            if 'Universe_Score' in row:
+                                label_text = f"{row['Symbol']}: U={row['Universe_Score']:.0f}, F={row['Fundamental_Score']:.0f}"
+                            else:
+                                label_text = row['Symbol']
+                                
                             ax.annotate(
-                                row['Symbol'],
+                                label_text,
                                 (row['RS-Ratio'], row['Fundamental_Score']),
                                 xytext=(5, 5),
                                 textcoords='offset points',
