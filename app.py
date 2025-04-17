@@ -240,37 +240,29 @@ def save_uploaded_file(uploaded_file):
         f.write(uploaded_file.getvalue())
     return f.name
 
-if analyze_button or st.session_state.has_analyzed:
-    # Tentukan variabel yang akan digunakan berdasarkan session state jika tersedia
-    results_to_use = st.session_state.rrg_results if analyze_button else st.session_state.rrg_results
-    combined_to_use = st.session_state.combined_results if analyze_button else st.session_state.combined_results
-    analysis_type_to_use = analysis_type if analyze_button else st.session_state.analysis_type
-    use_fundamental_to_use = use_fundamental if analyze_button else st.session_state.use_fundamental
-    use_universe_score_to_use = use_universe_score if analyze_button else st.session_state.use_universe_score
-    analysis_date_to_use = rrg_analyzer.get_analysis_date().strftime('%d %B %Y') if analyze_button else st.session_state.analysis_date
-
-    # Tentukan variabel yang akan digunakan
+# Tampilkan hasil (dari analisis saat ini atau dari session state)
+if (analyze_button and ((rrg_results is not None and len(rrg_results) > 0) or combined_results is not None)) or st.session_state.data_analyzed:
+    # Pilih sumber data (dari analisis saat ini atau session state)
     if analyze_button:
-        # Jika tombol analisis ditekan, gunakan hasil terbaru
-        results_to_use = rrg_results
-        combined_to_use = combined_results
-        analysis_type_to_use = analysis_type
-        use_fundamental_to_use = use_fundamental
-        use_universe_score_to_use = use_universe_score
-        # Simpan tanggal analisis ke session state
-        if 'rrg_analyzer' in locals() and hasattr(rrg_analyzer, 'get_analysis_date'):
-            st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
-        else:
-            st.session_state.analysis_date = datetime.now().strftime('%d %B %Y')
-        analysis_date_to_use = st.session_state.analysis_date
+        # Data dari analisis yang baru dijalankan
+        display_rrg = rrg_results
+        display_combined = combined_results 
+        display_analysis_type = analysis_type
+        display_use_fundamental = use_fundamental
+        display_use_universe_score = use_universe_score
+        # Ambil tanggal analisis
+        analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
     else:
-        # Jika tidak, gunakan data dari session state
-        results_to_use = st.session_state.rrg_results
-        combined_to_use = st.session_state.combined_results
-        analysis_type_to_use = st.session_state.analysis_type
-        use_fundamental_to_use = st.session_state.use_fundamental
-        use_universe_score_to_use = st.session_state.use_universe_score
-        analysis_date_to_use = st.session_state.analysis_date
+        # Data dari session state (analisis sebelumnya)
+        display_rrg = st.session_state.rrg_results
+        display_combined = st.session_state.combined_results
+        display_analysis_type = st.session_state.analysis_type
+        display_use_fundamental = st.session_state.use_fundamental
+        display_use_universe_score = st.session_state.use_universe_score
+        analysis_date = st.session_state.analysis_date
+
+    # Tampilkan tanggal analisis aktual
+    st.subheader(f"Analisis pada tanggal: {analysis_date}")
 
     if (results_to_use is None or len(results_to_use) == 0) and combined_to_use is None:
         st.error("Tidak dapat melakukan analisis. Pastikan data tersedia dan parameter sudah benar.")
@@ -472,10 +464,11 @@ if analyze_button or st.session_state.has_analyzed:
             st.session_state.analysis_type = analysis_type
             st.session_state.use_fundamental = use_fundamental
             st.session_state.use_universe_score = use_universe_score
-            if 'rrg_analyzer' in locals() and hasattr(rrg_analyzer, 'get_analysis_date'):
-                st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
-            else:
-                st.session_state.analysis_date = datetime.now().strftime('%d %B %Y')
+            st.session_state.analysis_date = analysis_date  # Gunakan analysis_date yang sudah diformat sebelumnya
+            #if 'rrg_analyzer' in locals() and hasattr(rrg_analyzer, 'get_analysis_date'):
+            #    st.session_state.analysis_date = rrg_analyzer.get_analysis_date().strftime('%d %B %Y')
+            #else:
+            #    st.session_state.analysis_date = datetime.now().strftime('%d %B %Y')
             
             # Tampilkan hasil
             if (rrg_results is None or len(rrg_results) == 0) and combined_results is None:
@@ -840,50 +833,54 @@ if analyze_button or st.session_state.has_analyzed:
                 st.markdown("---")
                 st.subheader("📄 Generate Report")
 
-                if st.button("📊 Generate PDF Report", type="primary", key="generate_report_btn"):
-                    # Tampilkan indikator proses
-                    report_progress = st.progress(0, text="Mempersiapkan laporan...")
-                    
-                    # Buat placeholder untuk pesan status
-                    status_placeholder = st.empty()
-                    status_placeholder.info("Membuat laporan PDF, mohon tunggu...")
-                    
-                    try:
-                        # Update progress
-                        report_progress.progress(25, text="Mengumpulkan data analisis...")
-                        time.sleep(0.5)
+                # Tombol hanya aktif jika ada data analisis
+                if st.session_state.data_analyzed:
+                    if st.button("📊 Generate PDF Report", type="primary", key="generate_report"):
+                        # Tampilkan indikator proses
+                        report_progress = st.progress(0, text="Mempersiapkan laporan...")
                         
-                        report_progress.progress(50, text="Membuat visualisasi...")
-                        time.sleep(0.5)
+                        # Buat placeholder untuk pesan status
+                        status_placeholder = st.empty()
+                        status_placeholder.info("Membuat laporan PDF, mohon tunggu...")
                         
-                        report_progress.progress(75, text="Menyusun laporan...")
+                        try:
+                            # Update progress
+                            report_progress.progress(25, text="Mengumpulkan data analisis...")
+                            time.sleep(0.5)
+                            
+                            report_progress.progress(50, text="Membuat visualisasi...")
+                            time.sleep(0.5)
+                            
+                            report_progress.progress(75, text="Menyusun laporan...")
+                            
+                            # Gunakan data dari session state untuk membuat laporan
+                            create_and_download_report(
+                                st.session_state.combined_results if st.session_state.combined_results is not None else st.session_state.rrg_results,
+                                st.session_state.analysis_type,
+                                st.session_state.use_fundamental,
+                                st.session_state.use_universe_score
+                            )
+                            
+                            # Update progress ke 100% menandakan selesai
+                            report_progress.progress(100, text="Laporan selesai!")
+                            time.sleep(0.5)
+                            
+                            # Hapus progress bar setelah selesai
+                            report_progress.empty()
+                            
+                            # Update pesan status
+                            status_placeholder.success("✅ Laporan PDF berhasil dibuat! Klik tombol download di bawah untuk mengunduh.")
                         
-                        # Panggil fungsi untuk membuat laporan PDF
-                        create_and_download_report(
-                            st.session_state.combined_results if st.session_state.combined_results is not None else st.session_state.rrg_results,
-                            st.session_state.analysis_type,
-                            st.session_state.use_fundamental,
-                            st.session_state.use_universe_score
-                        )
-                        
-                        # Update progress ke 100% menandakan selesai
-                        report_progress.progress(100, text="Laporan selesai!")
-                        time.sleep(0.5)
-                        
-                        # Hapus progress bar setelah selesai
-                        report_progress.empty()
-                        
-                        # Update pesan status
-                        status_placeholder.success("✅ Laporan PDF berhasil dibuat! Klik tombol download di bawah untuk mengunduh.")
-                    
-                    except Exception as e:
-                        # Jika terjadi error, tampilkan pesan error
-                        report_progress.empty()
-                        status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
-                        if 'debug_mode' in locals() and debug_mode:
-                            st.error(f"Detail error: {str(e)}")
-                            import traceback
-                            st.code(traceback.format_exc())
+                        except Exception as e:
+                            # Jika terjadi error, tampilkan pesan error
+                            report_progress.empty()
+                            status_placeholder.error(f"❌ Terjadi kesalahan saat membuat laporan: {str(e)}")
+                            if debug_mode:
+                                st.error(f"Detail error: {str(e)}")
+                                import traceback
+                                st.code(traceback.format_exc())
+                else:
+                    st.info("Jalankan analisis terlebih dahulu sebelum membuat laporan.")
                 
         except Exception as e:
             st.error(f"Terjadi kesalahan dalam analisis: {str(e)}")
