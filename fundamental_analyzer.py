@@ -236,7 +236,8 @@ class FundamentalAnalyzer:
         
         # Isi nilai NaN dengan 0 untuk skor fundamental
         if 'Fundamental_Score' in combined_data.columns:
-            combined_data['Fundamental_Score'].fillna(0, inplace=True)
+            combined_data = combined_data.copy()  # Membuat salinan eksplisit
+            combined_data['Fundamental_Score'] = combined_data['Fundamental_Score'].fillna(0)
         else:
             combined_data['Fundamental_Score'] = 0
         

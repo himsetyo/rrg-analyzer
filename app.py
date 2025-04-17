@@ -421,7 +421,7 @@ if analyze_button:
                         ax.axhline(y=30, color='red', linestyle='--', alpha=0.5)
                         
                         # Tambahkan garis vertikal di nilai 100 (garis tengah RS-Ratio)
-                        ax.ax_vline(x=100, color='gray', linestyle='-', alpha=0.3)
+                        ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
                         ax.set_title('Fundamental Score vs RS-Ratio', fontsize=14)
                         ax.set_xlabel('RS-Ratio (Technical Strength)', fontsize=12)
                         ax.set_ylabel('Fundamental Score', fontsize=12)
@@ -521,10 +521,10 @@ if analyze_button:
                     
                     # Terapkan highlight pada kolom yang ada
                     if 'Quadrant' in results_to_show.columns:
-                        styled_table = styled_table.applymap(highlight_quadrant, subset=['Quadrant'])
+                        styled_table = styled_table.map(highlight_quadrant, subset=['Quadrant'])
                     
                     if 'Combined_Recommendation' in results_to_show.columns:
-                        styled_table = styled_table.applymap(highlight_recommendation, subset=['Combined_Recommendation'])
+                        styled_table = styled_table.map(highlight_recommendation, subset=['Combined_Recommendation'])
                     
                     # Tampilkan tabel dengan format
                     st.dataframe(styled_table)
@@ -693,11 +693,12 @@ if analyze_button:
                 st.code(traceback.format_exc())
             
             # Clean up temp files
-            if 'benchmark_temp' in locals():
+            if 'benchmark_temp' in locals() and os.path.exists(benchmark_temp):
                 os.unlink(benchmark_temp)
             if 'stock_temps' in locals():
                 for temp_file in stock_temps:
-                    os.unlink(temp_file)
+                    if os.path.exists(temp_file):
+                        os.unlink(temp_file)
             else: # Tampilkan info default ketika aplikasi pertama kali dibuka st.info("👈 Upload file CSV di panel sebelah kiri dan atur parameter, lalu klik 'Jalankan Analisis'.")
                 # Tampilkan contoh format file CSV
                 with st.expander("📝 Format File CSV yang Diperlukan"):
