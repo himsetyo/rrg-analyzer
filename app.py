@@ -113,7 +113,7 @@ if use_fundamental:
                 "Scoring Stock Universe (0-100):", 
                 min_value=0, 
                 max_value=100, 
-                value=50,
+                value=100,
                 help="Masukkan skor kesehatan emiten (0-100) berdasarkan penilaian laba 3 tahun terakhir, total return, dan notasi bursa"
             )
         
