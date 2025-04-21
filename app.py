@@ -342,6 +342,9 @@ def run_analysis(benchmark_file, stock_files, analysis_params):
         st.session_state.use_universe_score = results['use_universe_score']
         st.session_state.analysis_date = results['analysis_date']
         
+        # Simpan trail_length ke session state
+        st.session_state.trail_length = analysis_params.get('trail_length', 12)
+
         # Muat hasil untuk ditampilkan
         display_results()
         
@@ -365,6 +368,9 @@ def display_results():
     use_universe_score = st.session_state.use_universe_score
     analysis_date = st.session_state.analysis_date
     
+    # Ambil parameter trail_length dari session state
+    # trail_length = st.session_state.get('trail_length', 12)  # Default 12 jika tidak ada
+
     # Tampilkan tanggal analisis
     st.subheader(f"Analisis pada tanggal: {analysis_date}")
     
