@@ -418,7 +418,8 @@ def display_results():
                     rrg_analyzer.ticker_map[ticker] = ticker
             
             # Plot dengan parameter yang sesuai
-            fig = rrg_analyzer.plot_rrg(trail_length=trail_length)
+            # fig = rrg_analyzer.plot_rrg(trail_length=trail_length)
+            fig = rrg_analyzer.plot_rrg()  # Gunakan default trail_length=4 dari fungsi
             st.pyplot(fig)
             
         elif analysis_type == "Fundamental" and use_fundamental:
