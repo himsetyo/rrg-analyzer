@@ -387,34 +387,17 @@ class RRGAnalyzer:
         ax.axhline(y=100, color='gray', linestyle='-', alpha=0.3)
         ax.axvline(x=100, color='gray', linestyle='-', alpha=0.3)
         
-        # Definisikan batas grafik yang seimbang
-        x_min, x_max = 70, 130  # Sekarang seimbang (30 unit ke bawah dan 30 unit ke atas)
-        y_min, y_max = 70, 130  # Sekarang seimbang (30 unit ke bawah dan 30 unit ke atas)
-        
         # Tambahkan latar belakang kuadran
-        ax.fill_between([100, x_max], 100, y_max, color='green', alpha=0.1)  # Leading
-        ax.fill_between([100, x_max], y_min, 100, color='yellow', alpha=0.1)  # Weakening
-        ax.fill_between([x_min, 100], y_min, 100, color='red', alpha=0.1)     # Lagging
-        ax.fill_between([x_min, 100], 100, y_max, color='blue', alpha=0.1)   # Improving
+        ax.fill_between([100, 120], 100, 120, color='green', alpha=0.1)  # Leading
+        ax.fill_between([100, 120], 80, 100, color='yellow', alpha=0.1)  # Weakening
+        ax.fill_between([80, 100], 80, 100, color='red', alpha=0.1)     # Lagging
+        ax.fill_between([80, 100], 100, 120, color='blue', alpha=0.1)   # Improving
         
-        # Hitung posisi tengah setiap kuadran untuk teks
-        leading_x = 100 + (x_max - 100) / 2
-        leading_y = 100 + (y_max - 100) / 2
-        
-        weakening_x = 100 + (x_max - 100) / 2
-        weakening_y = 100 - (100 - y_min) / 2
-        
-        lagging_x = 100 - (100 - x_min) / 2
-        lagging_y = 100 - (100 - y_min) / 2
-        
-        improving_x = 100 - (100 - x_min) / 2
-        improving_y = 100 + (y_max - 100) / 2
-        
-        # Tambahkan label kuadran dengan posisi yang tepat di tengah
-        ax.text(leading_x, leading_y, 'LEADING', fontsize=12, ha='center', va='center')
-        ax.text(weakening_x, weakening_y, 'WEAKENING', fontsize=12, ha='center', va='center')
-        ax.text(lagging_x, lagging_y, 'LAGGING', fontsize=12, ha='center', va='center')
-        ax.text(improving_x, improving_y, 'IMPROVING', fontsize=12, ha='center', va='center')
+        # Tambahkan label kuadran
+        ax.text(110, 110, 'LEADING', fontsize=12, ha='center')
+        ax.text(110, 90, 'WEAKENING', fontsize=12, ha='center')
+        ax.text(90, 90, 'LAGGING', fontsize=12, ha='center')
+        ax.text(90, 110, 'IMPROVING', fontsize=12, ha='center')
         
         # Plot data untuk setiap saham
         for ticker in list(self.rs_ratio_norm.keys()):
@@ -442,6 +425,12 @@ class RRGAnalyzer:
                 # Gunakan ticker dari file CSV jika tersedia
                 display_name = self.ticker_map.get(ticker, ticker)
                 
+                # Jika ticker berakhir dengan " Index" atau " Equity", hapus itu
+                if " Index" in display_name:
+                    display_name = display_name.replace(" Index", "")
+                elif " Equity" in display_name:
+                    display_name = display_name.replace(" Equity", "")
+                
                 # Jika masih terlalu panjang, potong ke 8 karakter
                 if len(display_name) > 8:
                     display_name = display_name[:8]
@@ -450,15 +439,17 @@ class RRGAnalyzer:
                 ax.annotate(display_name, (x_data[-1], y_data[-1]), xytext=(5, 5), textcoords='offset points')
         
         # Set batas dan label
-        ax.set_xlim(x_min, x_max)
-        ax.set_ylim(y_min, y_max)
+        ax.set_xlim(80, 120)
+        ax.set_ylim(80, 120)
         ax.grid(True, alpha=0.3)
         ax.set_xlabel('RS-Ratio (Relative Strength)')
         ax.set_ylabel('RS-Momentum')
         
         # Format judul dengan nama benchmark yang lebih bersih
-        if hasattr(self, 'benchmark_ticker') and self.benchmark_ticker:
+        if self.benchmark_ticker:
             benchmark_display = self.benchmark_ticker
+            if " Index" in benchmark_display:
+                benchmark_display = benchmark_display.replace(" Index", "")
         elif self.benchmark_file:
             benchmark_display = os.path.splitext(os.path.basename(self.benchmark_file))[0]
         else:
