@@ -24,6 +24,8 @@ if 'use_universe_score' not in st.session_state:
     st.session_state.use_universe_score = False
 if 'analysis_date' not in st.session_state:
     st.session_state.analysis_date = None
+if 'trail_length' not in st.session_state:
+    st.session_state.trail_length = 12
 
 # Konfigurasi halaman
 st.set_page_config(
