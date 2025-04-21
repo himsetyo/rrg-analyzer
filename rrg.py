@@ -6,14 +6,20 @@ import os
 import re
 
 class RRGAnalyzer:
-    def __init__(self, benchmark_file=None, stock_files=None, period_years=3, max_date=None):
+    def __init__(self, excel_file=None, benchmark_ticker=None, stock_tickers=None, benchmark_file=None, stock_files=None, period_years=3, max_date=None):
         """
         Inisialisasi analyzer RRG
-        :param benchmark_file: path file CSV benchmark
-        :param stock_files: list path file CSV saham
+        :param excel_file: path file Excel dari Bloomberg
+        :param benchmark_ticker: ticker benchmark (misalnya "JCI Index")
+        :param stock_tickers: list ticker saham untuk analisis
+        :param benchmark_file: path file CSV benchmark (untuk mode CSV)
+        :param stock_files: list path file CSV saham (untuk mode CSV)
         :param period_years: periode tahun data yang akan diambil
-        :param max_date: tanggal maksimal untuk analisis (datetime, string 'YYYY-MM-DD', atau string date)
+        :param max_date: tanggal maksimal untuk analisis (datetime atau string 'YYYY-MM-DD')
         """
+        self.excel_file = excel_file
+        self.benchmark_ticker = benchmark_ticker
+        self.stock_tickers = stock_tickers if stock_tickers else []
         self.benchmark_file = benchmark_file
         self.stock_files = stock_files if stock_files else []
         self.period_years = period_years
@@ -21,21 +27,12 @@ class RRGAnalyzer:
         # Konversi max_date ke datetime jika string
         if isinstance(max_date, str):
             try:
-                # Coba dengan format YYYY-MM-DD
-                self.max_date = pd.to_datetime(max_date)
+                self.max_date = datetime.strptime(max_date, '%Y-%m-%d')
             except:
-                try:
-                    # Jika gagal, coba format yang lain (seperti MM/DD/YYYY)
-                    self.max_date = pd.to_datetime(max_date, format='%m/%d/%Y')
-                except Exception as e:
-                    print(f"Format tanggal tidak valid: {max_date}. Error: {str(e)}. Menggunakan tanggal hari ini.")
-                    self.max_date = pd.to_datetime(datetime.now())
-        elif isinstance(max_date, datetime):
-            # Konversi datetime ke pandas Timestamp
-            self.max_date = pd.to_datetime(max_date)
+                print(f"Format tanggal tidak valid: {max_date}. Menggunakan tanggal hari ini.")
+                self.max_date = datetime.now()
         else:
-            # Jika None, gunakan hari ini
-            self.max_date = pd.to_datetime(datetime.now())
+            self.max_date = max_date if max_date else datetime.now()
         
         self.benchmark_data = None
         self.stock_data = {}
@@ -45,6 +42,135 @@ class RRGAnalyzer:
         self.rs_ratio_norm = {}
         self.rs_momentum_norm = {}
         self.ticker_map = {}  # Untuk menyimpan mapping ticker asli dari file CSV
+        
+    def load_data_from_bloomberg_excel(self):
+        """
+        Load data dari file Excel Bloomberg
+        """
+        if not self.excel_file or not self.benchmark_ticker or not self.stock_tickers:
+            print("File Excel, benchmark ticker atau stock tickers tidak valid")
+            return False
+        
+        try:
+            # Baca seluruh file Excel
+            df = pd.read_excel(self.excel_file, header=None)
+            
+            # Find the relevant data rows (starting after the second table header)
+            # Biasanya data dimulai setelah baris header "Dates"
+            for i, row in df.iterrows():
+                if isinstance(row[0], datetime) or (isinstance(row[0], str) and row[0].lower() == 'dates'):
+                    start_row = i
+                    break
+            else:
+                print("Format data tidak ditemukan")
+                return False
+            
+            # Tentukan apakah header adalah "Dates" atau tanggal langsung
+            if isinstance(df.iloc[start_row, 0], str) and df.iloc[start_row, 0].lower() == 'dates':
+                # Header found, data starts on the next row
+                data_start_row = start_row + 1
+                date_col = 0
+            else:
+                # No header, this row already contains dates
+                data_start_row = start_row
+                date_col = 0
+            
+            # Temukan kolom untuk ticker yang diperlukan
+            ticker_columns = {}
+            for ticker in [self.benchmark_ticker] + self.stock_tickers:
+                ticker_pattern = re.compile(f"{re.escape(ticker)}\\s*$", re.IGNORECASE)
+                
+                # Cari kolom PX_LAST (Close) untuk ticker
+                found = False
+                for col in range(len(df.columns)):
+                    cell_value = str(df.iloc[data_start_row-1, col]) if data_start_row > 0 else ""
+                    if ticker_pattern.search(cell_value):
+                        # Simpan informasi kolom (kita butuh 5 kolom berturut-turut untuk OHLCV)
+                        base_col = col
+                        
+                        # Periksa 5 kolom berikutnya untuk memastikan mereka adalah OHLCV
+                        ticker_columns[ticker] = {
+                            'open': base_col,     # PX_OPEN
+                            'high': base_col + 1, # PX_HIGH
+                            'low': base_col + 2,  # PX_LOW
+                            'close': base_col + 3, # PX_LAST
+                            'volume': base_col + 4 # PX_VOLUME
+                        }
+                        found = True
+                        break
+                
+                if not found:
+                    print(f"Ticker {ticker} tidak ditemukan di file Excel")
+                    if ticker == self.benchmark_ticker:
+                        # Jika benchmark tidak ditemukan, kita tidak bisa melanjutkan
+                        return False
+            
+            # Proses data untuk benchmark
+            if self.benchmark_ticker in ticker_columns:
+                cols = ticker_columns[self.benchmark_ticker]
+                
+                # Extract date and OHLCV data untuk benchmark
+                benchmark_data = df.iloc[data_start_row:, [date_col, cols['open'], cols['high'], cols['low'], cols['close'], cols['volume']]]
+                benchmark_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                
+                # Konversi data ke format yang diperlukan
+                benchmark_data['Date'] = pd.to_datetime(benchmark_data['Date'])
+                benchmark_data = benchmark_data.set_index('Date')
+                benchmark_data = benchmark_data.apply(pd.to_numeric, errors='coerce')
+                
+                # Filter berdasarkan max_date
+                benchmark_data = benchmark_data[benchmark_data.index <= self.max_date]
+                
+                # Filter untuk periode yang diminta
+                if self.period_years > 0:
+                    end_date = benchmark_data.index.max()
+                    start_date = end_date - pd.DateOffset(years=self.period_years)
+                    benchmark_data = benchmark_data.loc[start_date:end_date]
+                
+                # Simpan data benchmark
+                self.benchmark_data = benchmark_data
+            
+            # Proses data untuk saham
+            for ticker in self.stock_tickers:
+                if ticker in ticker_columns:
+                    cols = ticker_columns[ticker]
+                    
+                    # Extract date and OHLCV data untuk saham
+                    stock_data = df.iloc[data_start_row:, [date_col, cols['open'], cols['high'], cols['low'], cols['close'], cols['volume']]]
+                    stock_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                    
+                    # Konversi data ke format yang diperlukan
+                    stock_data['Date'] = pd.to_datetime(stock_data['Date'])
+                    stock_data = stock_data.set_index('Date')
+                    stock_data = stock_data.apply(pd.to_numeric, errors='coerce')
+                    
+                    # Filter berdasarkan max_date
+                    stock_data = stock_data[stock_data.index <= self.max_date]
+                    
+                    # Filter untuk periode yang diminta
+                    if self.period_years > 0:
+                        end_date = stock_data.index.max()
+                        start_date = end_date - pd.DateOffset(years=self.period_years)
+                        stock_data = stock_data.loc[start_date:end_date]
+                    
+                    # Simpan data saham
+                    self.stock_data[ticker] = stock_data
+                    
+                    # Tambahkan ke daftar simbol
+                    self.stock_symbols.append(ticker)
+            
+            # Periksa apakah ada data saham yang berhasil dimuat
+            if not self.stock_data:
+                print("Tidak ada data saham yang berhasil dimuat")
+                return False
+            
+            return True
+        
+        except Exception as e:
+            print(f"Error saat memuat data dari file Excel: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def load_data_from_files(self):
         """
@@ -63,21 +189,18 @@ class RRGAnalyzer:
             if date_col in self.benchmark_data.columns:
                 # Coba konversi tanggal
                 try:
-                    # Gunakan pd.to_datetime yang lebih fleksibel
-                    self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col], errors='coerce')
-                    
-                    # Hapus data dengan tanggal invalid
-                    invalid_dates = self.benchmark_data[date_col].isna()
-                    if invalid_dates.any():
-                        print(f"Menghapus {invalid_dates.sum()} baris dengan tanggal tidak valid dari benchmark data")
-                        self.benchmark_data = self.benchmark_data[~invalid_dates]
-                    
-                    # Set index dan sort
-                    self.benchmark_data.set_index(date_col, inplace=True)
-                    self.benchmark_data.sort_index(inplace=True)
-                except Exception as e:
-                    print(f"Gagal mengkonversi format tanggal benchmark: {str(e)}")
-                    return False
+                    # Pertama coba format default YYYY-MM-DD
+                    self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col])
+                except:
+                    try:
+                        # Jika gagal, coba format MM/DD/YYYY
+                        self.benchmark_data[date_col] = pd.to_datetime(self.benchmark_data[date_col], format='%m/%d/%Y')
+                    except Exception as e:
+                        print(f"Gagal mengkonversi format tanggal: {e}")
+                        return False
+                
+                self.benchmark_data.set_index(date_col, inplace=True)
+                self.benchmark_data.sort_index(inplace=True)
             else:
                 print("Kolom 'Date' tidak ditemukan di file benchmark")
                 return False
@@ -91,29 +214,18 @@ class RRGAnalyzer:
                 benchmark_basename = os.path.splitext(os.path.basename(self.benchmark_file))[0]
                 self.benchmark_ticker = benchmark_basename
             
-            # Filter berdasarkan max_date - pastikan menggunakan tipe data yang sama
-            try:
-                # Pastikan tipe data max_date kompatibel dengan indeks
-                max_date_timestamp = pd.to_datetime(self.max_date)
-                # Gunakan operator .loc untuk menghindari kesalahan tipe data
-                self.benchmark_data = self.benchmark_data.loc[self.benchmark_data.index <= max_date_timestamp]
-            except Exception as e:
-                print(f"Error saat mem-filter data berdasarkan max_date: {str(e)}")
-                # Jika error, jangan filter berdasarkan tanggal dan lanjutkan
+            # Filter berdasarkan max_date
+            self.benchmark_data = self.benchmark_data[self.benchmark_data.index <= self.max_date]
             
             if self.benchmark_data.empty:
-                print("Data benchmark kosong setelah filter tanggal")
+                print("Data benchmark kosong")
                 return False
             
             # Filter data berdasarkan periode tahun
             if self.period_years > 0:
-                try:
-                    end_date = self.benchmark_data.index.max()
-                    start_date = end_date - pd.DateOffset(years=self.period_years)
-                    self.benchmark_data = self.benchmark_data.loc[self.benchmark_data.index >= start_date]
-                except Exception as e:
-                    print(f"Error saat mem-filter data berdasarkan periode tahun: {str(e)}")
-                    # Jika error, jangan filter berdasarkan periode dan lanjutkan
+                end_date = self.benchmark_data.index.max()
+                start_date = end_date - pd.DateOffset(years=self.period_years)
+                self.benchmark_data = self.benchmark_data.loc[start_date:end_date]
             
             # Load stock data
             load_success = False
@@ -131,21 +243,18 @@ class RRGAnalyzer:
                     # Cek dan konversi format tanggal jika perlu
                     if date_col in stock_data.columns:
                         try:
-                            # Gunakan pd.to_datetime yang lebih fleksibel
-                            stock_data[date_col] = pd.to_datetime(stock_data[date_col], errors='coerce')
-                            
-                            # Hapus data dengan tanggal invalid
-                            invalid_dates = stock_data[date_col].isna()
-                            if invalid_dates.any():
-                                print(f"Menghapus {invalid_dates.sum()} baris dengan tanggal tidak valid dari file {file_symbol}")
-                                stock_data = stock_data[~invalid_dates]
-                            
-                            # Set index dan sort
-                            stock_data.set_index(date_col, inplace=True)
-                            stock_data.sort_index(inplace=True)
-                        except Exception as e:
-                            print(f"Gagal mengkonversi format tanggal untuk {file_symbol}: {str(e)}")
-                            continue
+                            # Pertama coba format default YYYY-MM-DD
+                            stock_data[date_col] = pd.to_datetime(stock_data[date_col])
+                        except:
+                            try:
+                                # Jika gagal, coba format MM/DD/YYYY
+                                stock_data[date_col] = pd.to_datetime(stock_data[date_col], format='%m/%d/%Y')
+                            except Exception as e:
+                                print(f"Gagal mengkonversi format tanggal untuk {file_symbol}: {e}")
+                                continue
+                        
+                        stock_data.set_index(date_col, inplace=True)
+                        stock_data.sort_index(inplace=True)
                     else:
                         print(f"Kolom 'Date' tidak ditemukan di file {file_symbol}")
                         continue
@@ -163,36 +272,21 @@ class RRGAnalyzer:
                         self.ticker_map[file_symbol] = file_symbol
                     
                     # Filter berdasarkan max_date
-                    try:
-                        # Pastikan tipe data max_date kompatibel dengan indeks
-                        max_date_timestamp = pd.to_datetime(self.max_date)
-                        # Gunakan operator .loc untuk menghindari kesalahan tipe data
-                        stock_data = stock_data.loc[stock_data.index <= max_date_timestamp]
-                    except Exception as e:
-                        print(f"Error saat mem-filter data {file_symbol} berdasarkan max_date: {str(e)}")
-                        # Jika error, jangan filter berdasarkan tanggal dan lanjutkan
+                    stock_data = stock_data[stock_data.index <= self.max_date]
                     
                     # Filter data berdasarkan periode tahun
                     if self.period_years > 0 and not self.benchmark_data.empty:
-                        try:
-                            # Gunakan periode yang sama dengan benchmark
-                            start_date = self.benchmark_data.index.min()
-                            end_date = self.benchmark_data.index.max()
-                            
-                            # Cari rentang tanggal yang ada di kedua dataset
-                            common_dates = stock_data.index.intersection(pd.date_range(start=start_date, end=end_date))
-                            
-                            if len(common_dates) > 0:
-                                # Gunakan tanggal pertama dan terakhir yang umum
-                                stock_data = stock_data.loc[common_dates.min():common_dates.max()]
-                            else:
-                                # Jika tidak ada tanggal yang sama, filter dengan periode tahun
-                                stock_end_date = stock_data.index.max()
-                                stock_start_date = stock_end_date - pd.DateOffset(years=self.period_years)
-                                stock_data = stock_data.loc[stock_data.index >= stock_start_date]
-                        except Exception as e:
-                            print(f"Error saat mem-filter data {file_symbol} berdasarkan periode: {str(e)}")
-                            # Jika error, jangan filter berdasarkan periode dan lanjutkan
+                        # Gunakan periode yang sama dengan benchmark
+                        start_date = self.benchmark_data.index.min()
+                        end_date = self.benchmark_data.index.max()
+                        
+                        if start_date in stock_data.index and end_date in stock_data.index:
+                            stock_data = stock_data.loc[start_date:end_date]
+                        else:
+                            # Filter dengan periode yang ada
+                            stock_end_date = stock_data.index.max()
+                            stock_start_date = stock_end_date - pd.DateOffset(years=self.period_years)
+                            stock_data = stock_data.loc[stock_start_date:stock_end_date]
                     
                     # Simpan data dan tambahkan symbol
                     if not stock_data.empty:
@@ -200,7 +294,7 @@ class RRGAnalyzer:
                         self.stock_symbols.append(file_symbol)
                         load_success = True
                     else:
-                        print(f"Data kosong untuk {file_symbol} setelah filtering")
+                        print(f"Data kosong untuk {file_symbol}")
                 
                 except Exception as e:
                     print(f"Error saat memuat data untuk {file_path}: {str(e)}")
@@ -230,7 +324,7 @@ class RRGAnalyzer:
             # Pastikan data memiliki index yang sama
             common_index = data.index.intersection(self.benchmark_data.index)
             if len(common_index) < period:
-                print(f"Data tidak cukup untuk {ticker}, minimal {period} hari diperlukan. Hanya tersedia {len(common_index)} hari.")
+                print(f"Data tidak cukup untuk {ticker}, minimal {period} hari diperlukan")
                 continue
                 
             stock_aligned = data.loc[common_index]
@@ -476,7 +570,10 @@ class RRGAnalyzer:
             return None
         
         # Load data
-        success = self.load_data_from_files()
+        if self.excel_file:
+            success = self.load_data_from_bloomberg_excel()
+        else:
+            success = self.load_data_from_files()
         
         if not success:
             print("Gagal memuat data")
@@ -513,4 +610,4 @@ class RRGAnalyzer:
         """
         if self.benchmark_data is not None and not self.benchmark_data.empty:
             return self.benchmark_data.index.max()
-        return pd.to_datetime(self.max_date)
+        return self.max_date
